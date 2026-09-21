@@ -1,5 +1,4 @@
-import os
-from app.config import Settings, get_settings
+from app.config import get_settings
 
 def test_settings_reads_env(monkeypatch):
     get_settings.cache_clear()
@@ -9,8 +8,10 @@ def test_settings_reads_env(monkeypatch):
     monkeypatch.setenv("MAX_CONTEXT_TOKENS", "2048")
     monkeypatch.setenv("MAX_HISTORY_TURNS", "6")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///./test.db")
-    s = Settings()
+    s = get_settings()
     assert s.openai_api_base == "http://localhost:11434/v1"
+    assert s.openai_api_key == "sk-test"
     assert s.model_name == "llama3"
     assert s.max_context_tokens == 2048
     assert s.max_history_turns == 6
+    assert s.database_url == "sqlite:///./test.db"

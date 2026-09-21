@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     max_history_turns: int = 10
     database_url: str = "sqlite:///./mewhelp.db"
 
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
