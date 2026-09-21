@@ -1,8 +1,14 @@
 from collections.abc import AsyncIterator
+import json
 
 from fastapi import APIRouter, HTTPException, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from fastapi.sse import EventSourceResponse, ServerSentEvent
+from fastapi.sse import (
+    EventSourceResponse,
+    ServerSentEvent,
+    format_sse_event,
+)
 
 from app.api.deps import DbSession
 from app.api.schemas import ChatRequest
@@ -20,7 +26,6 @@ router = APIRouter(prefix="/api/v1", tags=["chat"])
 
 @router.post(
     "/chat",
-    response_class=EventSourceResponse,
     response_model=None,
 )
 async def chat(payload: ChatRequest, db: DbSession) -> Response:
@@ -52,4 +57,10 @@ async def chat(payload: ChatRequest, db: DbSession) -> Response:
                 data={"type": "error", "message": str(exc)}
             )
 
-    return EventSourceResponse(events())
+    async def encoded_events() -> AsyncIterator[bytes]:
+        async for event in events():
+            yield format_sse_event(
+                data_str=json.dumps(jsonable_encoder(event.data))
+            )
+
+    return EventSourceResponse(encoded_events())
