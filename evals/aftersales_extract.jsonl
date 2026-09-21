@@ -1,0 +1,8 @@
+{"id":"e1","text":"订单ORD-8899一直没送到，希望尽快查物流","expect":{"order_id":"ORD-8899","intent_type":"logistics"}}
+{"id":"e2","text":"我买的耳机不想要了，订单号A20260921001，请帮我退货","expect":{"order_id":"A20260921001","intent_type":"return"}}
+{"id":"e3","text":"订单CN-7788收到后发现屏幕碎了，我想换一台新的","expect":{"order_id":"CN-7788","intent_type":"exchange"}}
+{"id":"e4","text":"商品有质量问题，麻烦原路退款，没有订单号","expect":{"order_id":null,"intent_type":"refund"}}
+{"id":"e5","text":"请取消订单cancel-42，我刚才下错单了","expect":{"order_id":"cancel-42","intent_type":"cancel"}}
+{"id":"e6","text":"订单INV2026007需要开公司抬头的增值税发票","expect":{"order_id":"INV2026007","intent_type":"invoice"}}
+{"id":"e7","text":"我的咖啡机坏了还在保修期，订单RMA-31415，想申请维修","expect":{"order_id":"RMA-31415","intent_type":"repair"}}
+{"id":"e8","text":"请问这款鞋还有蓝色吗？","expect":{"order_id":null,"intent_type":"other"}}
