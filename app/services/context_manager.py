@@ -32,7 +32,7 @@ def trim_messages(
     total_tokens = estimate_tokens(system_text) + sum(
         estimate_tokens(message["content"]) for message in kept
     )
-    while kept and total_tokens > max_tokens:
+    while len(kept) > 1 and total_tokens > max_tokens:
         remove_count = 1
         if (
             len(kept) >= 2

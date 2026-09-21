@@ -67,6 +67,23 @@ def test_token_budget_drops_oldest_pair():
     assert out == [{"role": "user", "content": "recent"}]
 
 
+def test_token_budget_keeps_latest_user_when_budget_exhausted():
+    """Latest user turn survives even when system alone exceeds max_tokens."""
+    system = "S" * 100  # ~25 tokens
+    latest_user = {"role": "user", "content": "need help now"}
+    msgs = [
+        {"role": "user", "content": "old question"},
+        {"role": "assistant", "content": "old answer"},
+        latest_user,
+    ]
+
+    out = trim_messages(
+        msgs, system_text=system, max_tokens=10, max_turns=10
+    )
+
+    assert out == [latest_user]
+
+
 def test_token_budget_drops_oldest_orphan_assistant_singly():
     msgs = [
         {"role": "assistant", "content": "A" * 20},
