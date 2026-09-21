@@ -125,7 +125,7 @@ class Settings(BaseSettings):
     model_name: str = "gpt-4o-mini"
     max_context_tokens: int = 4096
     max_history_turns: int = 10
-    database_url: str = "sqlite:///./mewhelp.db"
+    database_url: str = "sqlite:///./shoppilot.db"
 
 @lru_cache
 def get_settings() -> Settings:
@@ -154,7 +154,7 @@ OPENAI_API_KEY=sk-...
 MODEL_NAME=gpt-4o-mini
 MAX_CONTEXT_TOKENS=4096
 MAX_HISTORY_TURNS=10
-DATABASE_URL=sqlite:///./mewhelp.db
+DATABASE_URL=sqlite:///./shoppilot.db
 ```
 
 ```ini

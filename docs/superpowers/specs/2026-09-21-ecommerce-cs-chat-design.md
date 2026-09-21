@@ -181,7 +181,7 @@ System 消息**不入库**，每次请求由模板注入。
 
 - 无 `session_id`：创建 session，经 SSE `session` 事件或 JSON 字段返回 id。
 - 有 `session_id`：加载历史；不存在 → 404。
-- `DATABASE_URL` 默认 `sqlite:///./mewhelp.db`；启动时 `create_all`。
+- `DATABASE_URL` 默认 `sqlite:///./shoppilot.db`；启动时 `create_all`。
 
 ## 7. 上下文裁剪
 

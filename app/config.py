@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_name: str = "gpt-4o-mini"
     max_context_tokens: int = 4096
     max_history_turns: int = 10
-    database_url: str = "sqlite:///./mewhelp.db"
+    database_url: str = "sqlite:///./shoppilot.db"
 
 
 @lru_cache

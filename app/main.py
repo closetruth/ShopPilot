@@ -17,7 +17,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-app = FastAPI(title="MewHelp", lifespan=lifespan)
+app = FastAPI(title="ShopPilot", lifespan=lifespan)
 app.include_router(health_router)
 app.include_router(chat_router)
 app.include_router(extract_router)
