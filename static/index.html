@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MewHelp 智能客服</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f0f2f5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #1a73e8;
+      color: #fff;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    #session-id {
+      font-size: 0.75rem;
+      opacity: 0.85;
+      font-family: monospace;
+      max-width: 50%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .bubble {
+      max-width: 75%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      line-height: 1.5;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .bubble.user {
+      align-self: flex-end;
+      background: #1a73e8;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .bubble.assistant {
+      align-self: flex-start;
+      background: #fff;
+      color: #333;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .bubble.error {
+      align-self: center;
+      background: #fce8e6;
+      color: #c5221f;
+      font-size: 0.9rem;
+    }
+    .bubble.extract {
+      align-self: flex-start;
+      background: #e8f5e9;
+      color: #1b5e20;
+      font-family: monospace;
+      font-size: 0.85rem;
+      max-width: 90%;
+    }
+    #input-area {
+      background: #fff;
+      border-top: 1px solid #ddd;
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    #message-input {
+      flex: 1;
+      resize: none;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      min-height: 44px;
+      max-height: 120px;
+    }
+    #message-input:focus { outline: none; border-color: #1a73e8; }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #send-btn { background: #1a73e8; color: #fff; }
+    #send-btn:hover:not(:disabled) { background: #1557b0; }
+    #extract-btn { background: #e8f0fe; color: #1a73e8; }
+    #extract-btn:hover:not(:disabled) { background: #d2e3fc; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MewHelp 智能客服</h1>
+    <span id="session-id">会话：未建立</span>
+  </header>
+
+  <div id="messages"></div>
+
+  <div id="input-area">
+    <textarea id="message-input" rows="2" placeholder="输入消息…"></textarea>
+    <button id="extract-btn" type="button">抽取</button>
+    <button id="send-btn" type="button">发送</button>
+  </div>
+
+  <script>
+    let sessionId = null;
+    let sending = false;
+
+    const messagesEl = document.getElementById("messages");
+    const sessionEl = document.getElementById("session-id");
+    const inputEl = document.getElementById("message-input");
+    const sendBtn = document.getElementById("send-btn");
+    const extractBtn = document.getElementById("extract-btn");
+
+    function updateSessionDisplay() {
+      sessionEl.textContent = sessionId
+        ? "会话：" + sessionId
+        : "会话：未建立";
+    }
+
+    function appendBubble(text, role) {
+      const el = document.createElement("div");
+      el.className = "bubble " + role;
+      el.textContent = text;
+      messagesEl.appendChild(el);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return el;
+    }
+
+    function setBusy(busy) {
+      sending = busy;
+      sendBtn.disabled = busy;
+      extractBtn.disabled = busy;
+    }
+
+    function parseSseLine(line) {
+      if (!line.startsWith("data:")) return null;
+      const json = line.slice(5).trim();
+      if (!json) return null;
+      try {
+        return JSON.parse(json);
+      } catch {
+        return null;
+      }
+    }
+
+    async function consumeSse(response, onEvent) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const event = parseSseLine(line);
+          if (event) onEvent(event);
+        }
+      }
+
+      if (buffer.trim()) {
+        const event = parseSseLine(buffer.trim());
+        if (event) onEvent(event);
+      }
+    }
+
+    async function sendMessage() {
+      const message = inputEl.value.trim();
+      if (!message || sending) return;
+
+      appendBubble(message, "user");
+      inputEl.value = "";
+      setBusy(true);
+
+      const body = { message, mode: "chat" };
+      if (sessionId) body.session_id = sessionId;
+
+      let assistantEl = null;
+
+      try {
+        const response = await fetch("/api/v1/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          const detail = await response.text();
+          appendBubble("请求失败 (" + response.status + "): " + detail, "error");
+          return;
+        }
+
+        assistantEl = appendBubble("", "assistant");
+
+        await consumeSse(response, (event) => {
+          if (event.type === "session" && event.session_id) {
+            sessionId = event.session_id;
+            updateSessionDisplay();
+          } else if (event.type === "token" && event.content) {
+            assistantEl.textContent += event.content;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          } else if (event.type === "error") {
+            appendBubble(event.message || "未知错误", "error");
+          }
+        });
+      } catch (err) {
+        appendBubble("网络错误: " + err.message, "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function extractFields() {
+      const text = inputEl.value.trim();
+      if (!text || sending) return;
+
+      setBusy(true);
+
+      const body = { text };
+      if (sessionId) body.session_id = sessionId;
+
+      try {
+        const response = await fetch("/api/v1/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          const detail = await response.text();
+          appendBubble("抽取失败 (" + response.status + "): " + detail, "error");
+          return;
+        }
+
+        const result = await response.json();
+        appendBubble(JSON.stringify(result, null, 2), "extract");
+      } catch (err) {
+        appendBubble("网络错误: " + err.message, "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    extractBtn.addEventListener("click", extractFields);
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
+</body>
+</html>
