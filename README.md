@@ -1,5 +1,4 @@
-# ShopPilot · Ch01 电商智能客服（纯对话）
-
+# ShopPilot 
 ## 安装
 
 ```powershell
