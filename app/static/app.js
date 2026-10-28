@@ -18,6 +18,8 @@ const woEmpty = document.getElementById("woEmpty");
 const ordersClose = document.getElementById("ordersClose");
 const tabOrders = document.getElementById("tabOrders");
 const tabWorkOrders = document.getElementById("tabWorkOrders");
+const standaloneBtn = document.getElementById("standaloneBtn");
+const standaloneDraftHost = document.getElementById("standaloneDraftHost");
 
 let session = loadSession();
 let conversationId = session.conversation_id || null;
@@ -103,7 +105,7 @@ function renderDraftCard(draft) {
   wrap.appendChild(title);
 
   const rows = [
-    ["订单号", draft.order_no],
+    ["订单号", draft.order_no || "未关联订单"],
     ["问题类型", draft.issue_type],
     ["涉及商品", draft.product || "（未关联具体商品）"],
     ["问题描述", draft.description],
@@ -184,10 +186,23 @@ function renderSubmittedCard(card, order, reason) {
   meta.className = "wo-meta";
   meta.append(statusBadge(order.status));
   const t = document.createElement("span");
-  t.textContent = order.issue_type + " · " + order.order_no;
+  t.textContent = order.order_no
+    ? order.issue_type + " · " + order.order_no
+    : order.issue_type + " · 未关联订单";
   meta.appendChild(t);
 
   card.append(title, no, meta);
+
+  const descRow = document.createElement("div");
+  descRow.className = "wo-row";
+  const dk = document.createElement("span");
+  dk.className = "wo-k";
+  dk.textContent = "问题描述";
+  const dv = document.createElement("span");
+  dv.className = "wo-v";
+  dv.textContent = order.description;
+  descRow.append(dk, dv);
+  card.appendChild(descRow);
 
   if (order.product) {
     const p = document.createElement("div");
@@ -206,9 +221,7 @@ function renderSubmittedCard(card, order, reason) {
   link.type = "button";
   link.className = "wo-link";
   link.textContent = "在「我的工单」中查看";
-  link.addEventListener("click", () => {
-    openOrdersPanel().then(() => switchPanelTab("workorders"));
-  });
+  link.addEventListener("click", () => openOrdersPanel("workorders"));
   card.appendChild(link);
 }
 
@@ -217,6 +230,132 @@ function formatTime(iso) {
   if (Number.isNaN(d.getTime())) return iso;
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const ISSUE_TYPE_OPTIONS = [
+  "运输破损",
+  "发货延迟",
+  "质量问题",
+  "退换货",
+  "咨询",
+  "投诉建议",
+  "其他",
+];
+
+// 这几类不需要订单号：投诉服务、咨询政策本身与某笔订单无关
+const ORDERLESS_ISSUE_TYPES = ["咨询", "投诉建议", "其他"];
+
+function fillIssueTypes(select) {
+  for (const t of ISSUE_TYPE_OPTIONS) {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = ORDERLESS_ISSUE_TYPES.includes(t) ? t + "（无需订单）" : t;
+    select.appendChild(opt);
+  }
+}
+
+function buildDraftForm({ orderNo, onDone, onCancel }) {
+  const form = document.createElement("form");
+  form.className = "draft-form";
+
+  const typeSel = document.createElement("select");
+  typeSel.className = "draft-input";
+  fillIssueTypes(typeSel);
+  if (!orderNo) {
+    typeSel.value = "咨询";
+  }
+
+  const desc = document.createElement("textarea");
+  desc.className = "draft-input";
+  desc.rows = 3;
+  desc.placeholder = "请描述具体情况（至少 10 字），如现象、时间、部位";
+  desc.maxLength = 500;
+
+  const hint = document.createElement("p");
+  hint.className = "draft-hint";
+  hint.textContent = "";
+
+  const actions = document.createElement("div");
+  actions.className = "wo-actions";
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "wo-confirm";
+  submit.textContent = "提交工单";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "wo-cancel";
+  cancel.textContent = "取消";
+  actions.append(submit, cancel);
+
+  form.append(typeSel, desc, hint, actions);
+
+  cancel.addEventListener("click", onCancel);
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = desc.value.trim();
+    if (text.length < 10) {
+      hint.textContent = "请至少填写 10 个字，说明具体现象";
+      return;
+    }
+    const type = typeSel.value;
+    const needsOrder = !ORDERLESS_ISSUE_TYPES.includes(type);
+    if (!orderNo && needsOrder) {
+      hint.textContent = "「" + type + "」必须关联订单，请从订单列表中选择";
+      return;
+    }
+
+    submit.disabled = true;
+    cancel.disabled = true;
+    hint.textContent = "正在提交…";
+    try {
+      const draftRes = await fetch("/api/work-orders/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          visitor_id: session.visitor_id,
+          order_no: orderNo || null,
+          issue_type: type,
+          description: text,
+        }),
+      });
+      if (!draftRes.ok) {
+        const err = await draftRes.json().catch(() => ({}));
+        throw new Error(err.detail || "HTTP " + draftRes.status);
+      }
+      const draft = await draftRes.json();
+
+      if (draft.duplicate) {
+        onDone({
+          duplicate: true,
+          existing_work_order_no: draft.existing_work_order_no,
+          existing_status: draft.existing_status,
+        });
+        return;
+      }
+
+      const res = await fetch("/api/work-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draft_id: draft.draft_id,
+          visitor_id: session.visitor_id,
+        }),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      onDone(data);
+      loadOrders();
+      loadWorkOrders();
+    } catch (err) {
+      submit.disabled = false;
+      cancel.disabled = false;
+      hint.textContent = err.message || "提交失败，请稍后重试";
+    }
+  });
+
+  desc.focus();
+  return { form, desc, typeSel };
 }
 
 function renderOrderItem(order) {
@@ -271,129 +410,59 @@ function renderOrderItem(order) {
   return item;
 }
 
-const ISSUE_TYPE_OPTIONS = [
-  "运输破损",
-  "发货延迟",
-  "质量问题",
-  "退换货",
-  "其他",
-];
-
 function openDraftForm(item, order) {
   if (item.querySelector(".draft-form")) return;
 
-  const form = document.createElement("form");
-  form.className = "draft-form";
-
-  const typeSel = document.createElement("select");
-  typeSel.className = "draft-input";
-  for (const t of ISSUE_TYPE_OPTIONS) {
-    const opt = document.createElement("option");
-    opt.value = t;
-    opt.textContent = t;
-    typeSel.appendChild(opt);
-  }
-
-  const desc = document.createElement("textarea");
-  desc.className = "draft-input";
-  desc.rows = 3;
-  desc.placeholder = "请描述具体情况（至少 10 字），如现象、时间、部位";
-  desc.maxLength = 500;
-
-  const hint = document.createElement("p");
-  hint.className = "draft-hint";
-  hint.textContent = "";
-
-  const actions = document.createElement("div");
-  actions.className = "wo-actions";
-  const submit = document.createElement("button");
-  submit.type = "submit";
-  submit.className = "wo-confirm";
-  submit.textContent = "提交工单";
-  const cancel = document.createElement("button");
-  cancel.type = "button";
-  cancel.className = "wo-cancel";
-  cancel.textContent = "取消";
-  actions.append(submit, cancel);
-
-  form.append(typeSel, desc, hint, actions);
-  item.appendChild(form);
-
-  cancel.addEventListener("click", () => form.remove());
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const text = desc.value.trim();
-    if (text.length < 10) {
-      hint.textContent = "请至少填写 10 个字，说明具体现象";
-      return;
-    }
-    submit.disabled = true;
-    cancel.disabled = true;
-    hint.textContent = "正在提交…";
-    try {
-      const draftRes = await fetch("/api/work-orders/drafts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          visitor_id: session.visitor_id,
-          order_no: order.order_no,
-          issue_type: typeSel.value,
-          description: text,
-        }),
-      });
-      if (!draftRes.ok) throw new Error("HTTP " + draftRes.status);
-      const draft = await draftRes.json();
-
-      if (draft.duplicate) {
-        form.remove();
-        const done = document.createElement("div");
-        done.className = "order-done";
-        const t = document.createElement("span");
-        t.textContent =
-          "该订单已有同类工单 " +
-          draft.existing_work_order_no +
-          "（" +
-          draft.existing_status +
-          "），不重复提交";
-        done.appendChild(t);
-        item.appendChild(done);
-        loadWorkOrders();
-        return;
-      }
-
-      const res = await fetch("/api/work-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          draft_id: draft.draft_id,
-          visitor_id: session.visitor_id,
-        }),
-      });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-
+  const { form } = buildDraftForm({
+    orderNo: order.order_no,
+    onCancel: () => form.remove(),
+    onDone: (data) => {
       form.remove();
-      const done = document.createElement("div");
-      done.className = "order-done";
-      done.append(statusBadge(data.work_order.status));
-      const t = document.createElement("span");
-      t.textContent =
-        (data.reason === "duplicate" ? "已有同类工单 " : "已提交 ") +
-        data.work_order.work_order_no;
-      done.appendChild(t);
-      item.appendChild(done);
-
-      loadOrders();
-      loadWorkOrders();
-    } catch {
-      submit.disabled = false;
-      cancel.disabled = false;
-      hint.textContent = "提交失败，请稍后重试";
-    }
+      item.appendChild(resultBlock(data));
+    },
   });
 
-  desc.focus();
+  item.appendChild(form);
+}
+
+function resultBlock(data) {
+  const done = document.createElement("div");
+  done.className = "order-done";
+  if (data.duplicate) {
+    const t = document.createElement("span");
+    t.textContent =
+      "该订单已有同类工单 " +
+      data.existing_work_order_no +
+      "（" +
+      data.existing_status +
+      "），不重复提交";
+    done.appendChild(t);
+    return done;
+  }
+  done.append(statusBadge(data.work_order.status));
+  const t = document.createElement("span");
+  t.textContent =
+    (data.reason === "duplicate" ? "已有同类工单 " : "已提交 ") +
+    data.work_order.work_order_no;
+  done.appendChild(t);
+  return done;
+}
+
+function openStandaloneForm() {
+  const host = document.getElementById("standaloneDraftHost");
+  if (host.querySelector(".draft-form")) return;
+
+  const { form } = buildDraftForm({
+    orderNo: null,
+    onCancel: () => form.remove(),
+    onDone: (data) => {
+      form.remove();
+      host.appendChild(resultBlock(data));
+    },
+  });
+
+  host.appendChild(form);
+  host.scrollIntoView({ block: "nearest" });
 }
 
 async function loadOrders() {
@@ -446,7 +515,9 @@ function renderOrderItemForWorkOrder(order) {
 
   const meta = document.createElement("div");
   meta.className = "wo-item-meta";
-  meta.textContent = order.issue_type + " · " + order.order_no;
+  meta.textContent = order.order_no
+    ? order.issue_type + " · " + order.order_no
+    : order.issue_type + " · 未关联订单";
 
   const desc = document.createElement("div");
   desc.className = "wo-item-desc";
@@ -477,13 +548,16 @@ function switchPanelTab(tab) {
   ordersEmpty.hidden = !showOrders || ordersList.children.length > 0;
   woList.hidden = showOrders;
   woEmpty.hidden = showOrders || woList.children.length > 0;
+  standaloneBtn.hidden = !showOrders;
+  if (!showOrders) {
+    standaloneDraftHost.replaceChildren();
+  }
 }
 
-async function openOrdersPanel() {
+async function openOrdersPanel(tab = "orders") {
   ordersPanel.hidden = false;
-  switchPanelTab("orders");
   await Promise.all([loadOrders(), loadWorkOrders()]);
-  switchPanelTab("orders");
+  switchPanelTab(tab);
 }
 
 function closeOrdersPanel() {
@@ -494,6 +568,7 @@ ordersBtn.addEventListener("click", () => openOrdersPanel());
 ordersClose.addEventListener("click", closeOrdersPanel);
 tabOrders.addEventListener("click", () => switchPanelTab("orders"));
 tabWorkOrders.addEventListener("click", () => switchPanelTab("workorders"));
+standaloneBtn.addEventListener("click", openStandaloneForm);
 
 function renderConversations(list) {
   convListEl.replaceChildren();

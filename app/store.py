@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS work_order_drafts (
     id          VARCHAR(48)   NOT NULL PRIMARY KEY,
     visitor_id  VARCHAR(64)   NOT NULL,
-    conversation_id VARCHAR(32) NOT NULL,
-    order_no    VARCHAR(32)   NOT NULL,
+    conversation_id VARCHAR(32) NOT NULL DEFAULT '',
+    order_no    VARCHAR(32)   NULL,
     issue_type  VARCHAR(32)   NOT NULL,
     description TEXT          NOT NULL,
     created_at  DATETIME(6)   NOT NULL,
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS work_order_drafts (
 CREATE TABLE IF NOT EXISTS work_orders (
     id          VARCHAR(32)   NOT NULL PRIMARY KEY,
     visitor_id  VARCHAR(64)   NOT NULL,
-    order_no    VARCHAR(32)   NOT NULL,
+    order_no    VARCHAR(32)   NULL,
     product_id  VARCHAR(32)   NULL,
     status      VARCHAR(32)   NOT NULL,
     issue       TEXT          NOT NULL,
@@ -142,7 +142,23 @@ def _ensure_columns(cur) -> None:
             if name not in existing:
                 cur.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
-    # 工单可能未关联具体商品（订单号在商品表里查不到），需要允许为空
+    # 工单可以不带订单号与商品（咨询、投诉建议类），相关列需允许为空
+    cur.execute(
+        "SELECT TABLE_NAME, COLUMN_NAME, IS_NULLABLE FROM information_schema.COLUMNS"
+        " WHERE TABLE_SCHEMA = DATABASE()"
+        "   AND COLUMN_NAME = 'order_no'"
+        "   AND TABLE_NAME IN ('work_orders', 'work_order_drafts')"
+    )
+    nullable_fixes = [
+        (r["TABLE_NAME"], r["COLUMN_NAME"])
+        for r in cur.fetchall()
+        if r["IS_NULLABLE"] == "NO"
+    ]
+    for table, column in nullable_fixes:
+        cur.execute(
+            f"ALTER TABLE {table} MODIFY COLUMN {column} VARCHAR(32) NULL"
+        )
+
     cur.execute(
         "SELECT IS_NULLABLE FROM information_schema.COLUMNS"
         " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'work_orders'"
@@ -413,20 +429,36 @@ def get_order(visitor_id: str, order_no: str) -> dict | None:
 
 
 def find_open_work_order(
-    visitor_id: str, order_no: str, issue_type: str
+    visitor_id: str, order_no: str | None, issue_type: str
 ) -> dict | None:
-    """查找同一顾客、同一订单、同一类型且未完结的工单，用于防重复建单。"""
+    """查找同一顾客、同一订单、同一类型且未完结的工单，用于防重复建单。
+
+    无订单的工单（咨询/投诉建议/其他）按「顾客 + 类型」判重，否则 NULL
+    与 NULL 不相等，会导致无限重复建单。
+    """
     with _connect() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT id, status, created_at
-              FROM work_orders
-             WHERE visitor_id = %s AND order_no = %s AND issue_type = %s
-               AND status IN %s
-             ORDER BY id ASC LIMIT 1
-            """,
-            (visitor_id, order_no, issue_type, WORK_ORDER_OPEN_STATUSES),
-        )
+        if order_no is None:
+            cur.execute(
+                """
+                SELECT id, status, created_at
+                  FROM work_orders
+                 WHERE visitor_id = %s AND order_no IS NULL AND issue_type = %s
+                   AND status IN %s
+                 ORDER BY id ASC LIMIT 1
+                """,
+                (visitor_id, issue_type, WORK_ORDER_OPEN_STATUSES),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, status, created_at
+                  FROM work_orders
+                 WHERE visitor_id = %s AND order_no = %s AND issue_type = %s
+                   AND status IN %s
+                 ORDER BY id ASC LIMIT 1
+                """,
+                (visitor_id, order_no, issue_type, WORK_ORDER_OPEN_STATUSES),
+            )
         return cur.fetchone()
 
 
@@ -436,7 +468,7 @@ DRAFT_TTL_MINUTES = 30
 def create_work_order_draft(
     visitor_id: str,
     conversation_id: str,
-    order_no: str,
+    order_no: str | None,
     issue_type: str,
     description: str,
 ) -> dict:
@@ -509,20 +541,34 @@ def purge_expired_drafts() -> int:
         return cur.rowcount
 
 
-def _product_for_order(visitor_id: str, order_no: str) -> str | None:
-    """该顾客此订单关联的商品名，用于确认卡上核对。"""
+def _product_for_order(visitor_id: str, order_no: str | None) -> str | None:
+    """该顾客此订单关联的商品名，用于确认卡上核对。无订单时返回 None。"""
+    if order_no is None:
+        return None
     with _connect() as conn, conn.cursor() as cur:
         cur.execute(
             """
             SELECT p.name, p.color
-              FROM work_orders o
+              FROM orders o
               JOIN products p ON p.id = o.product_id
              WHERE o.visitor_id = %s AND o.order_no = %s
-             ORDER BY o.created_at DESC LIMIT 1
+             LIMIT 1
             """,
             (visitor_id, order_no),
         )
         row = cur.fetchone()
+        if row is None:
+            cur.execute(
+                """
+                SELECT p.name, p.color
+                  FROM work_orders o
+                  JOIN products p ON p.id = o.product_id
+                 WHERE o.visitor_id = %s AND o.order_no = %s
+                 ORDER BY o.created_at DESC LIMIT 1
+                """,
+                (visitor_id, order_no),
+            )
+            row = cur.fetchone()
     if row is None:
         return None
     return f"{row['name']}（{row['color']}）"
@@ -573,25 +619,39 @@ def get_work_order(visitor_id: str, work_order_no: str) -> dict | None:
 
 def create_work_order(
     visitor_id: str,
-    order_no: str,
+    order_no: str | None,
     issue_type: str,
     description: str,
 ) -> str:
-    """新建工单，返回对外工单号。归属与状态由服务端强制，不由模型传入。"""
+    """新建工单，返回对外工单号。归属与状态由服务端强制，不由模型传入。
+
+    order_no 为空时表示不与具体订单关联（咨询、投诉建议类）。
+    """
     work_order_no = "WO" + uuid.uuid4().hex[:10].upper()
 
     with _connect() as conn, conn.cursor() as cur:
-        # 商品从该顾客同一订单的既有工单继承；没有则留空
-        cur.execute(
-            """
-            SELECT product_id FROM work_orders
-             WHERE visitor_id = %s AND order_no = %s AND product_id IS NOT NULL
-             ORDER BY created_at DESC LIMIT 1
-            """,
-            (visitor_id, order_no),
-        )
-        row = cur.fetchone()
-        product_id = row["product_id"] if row else None
+        # 商品从该顾客同一订单的既有工单继承；无订单则留空
+        product_id = None
+        if order_no is not None:
+            cur.execute(
+                """
+                SELECT product_id FROM work_orders
+                 WHERE visitor_id = %s AND order_no = %s AND product_id IS NOT NULL
+                 ORDER BY created_at DESC LIMIT 1
+                """,
+                (visitor_id, order_no),
+            )
+            row = cur.fetchone()
+            product_id = row["product_id"] if row else None
+
+            if product_id is None:
+                cur.execute(
+                    "SELECT product_id FROM orders"
+                    " WHERE visitor_id = %s AND order_no = %s LIMIT 1",
+                    (visitor_id, order_no),
+                )
+                row = cur.fetchone()
+                product_id = row["product_id"] if row else None
 
         now = _now()
         cur.execute(

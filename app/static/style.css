@@ -393,6 +393,21 @@ html, body {
   border-bottom: 1px solid var(--line);
 }
 
+.standalone-btn {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.standalone-btn:hover { background: var(--hover); color: var(--ink); }
+
 .panel-tabs {
   display: flex;
   gap: 4px;

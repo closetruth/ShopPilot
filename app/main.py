@@ -96,7 +96,7 @@ def _draft_from_tool_event(event: dict, visitor_id: str, conversation_id: str):
 
     order_no = payload.get("order_no")
     issue_type = payload.get("issue_type")
-    if not (order_no and issue_type):
+    if not issue_type:
         return None
 
     tool_input = event.get("data", {}).get("input", {})
@@ -151,7 +151,7 @@ class WorkOrderConfirm(BaseModel):
 
 class WorkOrderDraftCreate(BaseModel):
     visitor_id: str = Field(min_length=1, max_length=64)
-    order_no: str = Field(min_length=1, max_length=32)
+    order_no: str | None = Field(default=None, max_length=32)
     issue_type: str = Field(min_length=1, max_length=32)
     description: str = Field(min_length=1, max_length=500)
 
@@ -172,7 +172,9 @@ async def create_draft(req: WorkOrderDraftCreate) -> dict:
         )
         raise HTTPException(status_code=422, detail=detail) from exc
 
-    if not store.visitor_has_order(req.visitor_id, query.order_no):
+    if query.order_no is not None and not store.visitor_has_order(
+        req.visitor_id, query.order_no
+    ):
         raise HTTPException(status_code=404, detail="订单不存在或不属于当前顾客")
 
     existing = store.find_open_work_order(

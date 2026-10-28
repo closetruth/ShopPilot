@@ -223,7 +223,8 @@ def _insert_order(visitor_id: str, order_no: str, product_id: str | None = None)
             cur.execute(
                 "INSERT INTO orders"
                 " (order_no, visitor_id, product_id, quantity, amount_cents, created_at)"
-                " VALUES (%s, %s, %s, 1, 5900, NOW(6))",
+                " VALUES (%s, %s, %s, 1, 5900, NOW(6))"
+                " ON DUPLICATE KEY UPDATE visitor_id = VALUES(visitor_id)",
                 (order_no, visitor_id, product_id),
             )
         conn.commit()
@@ -256,10 +257,33 @@ def test_list_orders_scoped_to_visitor(visitor):
     assert store.list_orders("someone-else") == []
 
 
-def test_get_order_scoped(visitor):
+def test_get_work_order_scoped(visitor):
     _insert_order(visitor, "ORDER20991004")
     assert store.get_order(visitor, "ORDER20991004") is not None
     assert store.get_order("another-visitor", "ORDER20991004") is None
+
+
+def test_create_orderless_work_order(visitor):
+    work_order_no = store.create_work_order(
+        visitor, None, "投诉建议", "客服回复太慢，等了一整天没人理"
+    )
+    order = store.get_work_order(visitor, work_order_no)
+    assert order is not None
+    assert order["order_no"] is None
+    assert order["product"] is None
+    assert order["issue_type"] == "投诉建议"
+
+
+def test_orderless_dedupe_uses_visitor_and_type(visitor):
+    """无订单时 NULL 不等于 NULL，必须按访客+类型判重，否则会无限重复建单。"""
+    store.create_work_order(visitor, None, "咨询", "想了解退换货政策具体是怎样的")
+    assert store.find_open_work_order(visitor, None, "咨询") is not None
+
+    # 不同类型不冲突
+    assert store.find_open_work_order(visitor, None, "投诉建议") is None
+
+    # 其他访客不冲突
+    assert store.find_open_work_order("someone-else", None, "咨询") is None
 
 
 def test_draft_does_not_create_work_order(visitor):

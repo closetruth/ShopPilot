@@ -107,3 +107,47 @@ def test_create_strips_description_whitespace():
         description="   收到时杯口有裂纹，外包装完好无损   ",
     )
     assert q.description == "收到时杯口有裂纹，外包装完好无损"
+
+
+def test_create_allows_orderless_for_consultation():
+    q = WorkOrderCreate(
+        issue_type="咨询",
+        description="想了解你们的退换货政策具体是怎样的",
+    )
+    assert q.order_no is None
+
+
+def test_create_allows_orderless_for_complaint():
+    q = WorkOrderCreate(
+        issue_type="投诉建议",
+        description="客服回复太慢，等了一整天没人理，希望改进",
+    )
+    assert q.order_no is None
+
+
+def test_create_allows_orderless_for_other():
+    q = WorkOrderCreate(
+        issue_type="其他",
+        description="想反馈一个页面上按钮错位的问题",
+    )
+    assert q.order_no is None
+
+
+@pytest.mark.parametrize(
+    "issue_type", ["运输破损", "发货延迟", "质量问题", "退换货"]
+)
+def test_create_requires_order_for_after_sale(issue_type):
+    with pytest.raises(ValidationError):
+        WorkOrderCreate(
+            issue_type=issue_type,
+            description="收到时杯口有裂纹，外包装完好无损",
+        )
+
+
+def test_create_treats_blank_order_as_none():
+    q = WorkOrderCreate(
+        order_no="   ",
+        issue_type="咨询",
+        description="想了解你们的退换货政策具体是怎样的",
+    )
+    assert q.order_no is None

@@ -100,21 +100,33 @@ def list_my_orders(runtime: ToolRuntime[AgentContext]) -> dict:
 @tool
 def draft_work_order(
     runtime: ToolRuntime[AgentContext],
-    order_no: Annotated[str, "订单号，8-32 位大写字母或数字"],
-    issue_type: Annotated[str, "问题类型，必须是：运输破损 / 发货延迟 / 质量问题 / 退换货 / 其他"],
+    issue_type: Annotated[
+        str,
+        "问题类型，必须是：运输破损 / 发货延迟 / 质量问题 / 退换货 / 咨询 / 投诉建议 / 其他",
+    ],
     description: Annotated[str, "顾客描述的具体问题，需包含可核实细节，10-500 字"],
+    order_no: Annotated[
+        str | None,
+        "订单号，8-32 位大写字母或数字。售后类问题必填；"
+        "咨询、投诉建议、其他类型可不填",
+    ] = None,
 ) -> dict:
     """为顾客准备一张待确认的售后工单草稿。本工具不会真正提交工单：
     它只把内容存成草稿，界面上会出现确认卡片，由顾客点击按钮后才会提交。
 
-    因此你不需要征求顾客口头同意，随时可以起草；但必须先把订单号、
-    问题类型与问题描述问清楚，缺信息时先追问。顾客点击界面上的确认按钮
-    后工单才会生成，你无法直接建立工单，也不要宣称「已提交」。
+    因此你不需要征求顾客口头同意，随时可以起草；但必须先把问题类型与
+    问题描述问清楚，缺信息时先追问。顾客点击界面上的确认按钮后工单才会
+    生成，你无法直接建立工单，也不要宣称「已提交」。
+
+    订单号规则：运输破损 / 发货延迟 / 质量问题 / 退换货 必须有订单号，
+    可先用 list_my_orders 找到；咨询 / 投诉建议 / 其他 无需订单号。
 
     同一顾客同一订单同一类型已有未完结工单时不会起草，会返回既有工单。"""
     try:
         query = WorkOrderCreate(
-            order_no=order_no, issue_type=issue_type, description=description
+            order_no=order_no,
+            issue_type=issue_type,
+            description=description,
         )
     except ValidationError as exc:
         return _validation_error(exc)
@@ -122,7 +134,9 @@ def draft_work_order(
     visitor_id = runtime.context.visitor_id
 
     try:
-        if not store.visitor_has_order(visitor_id, query.order_no):
+        if query.order_no is not None and not store.visitor_has_order(
+            visitor_id, query.order_no
+        ):
             return {
                 "created": False,
                 "reason": "order_not_found",
@@ -139,7 +153,7 @@ def draft_work_order(
                 "reason": "duplicate",
                 "existing_work_order_no": existing["id"],
                 "existing_status": existing["status"],
-                "note": "该订单已有同类未完结工单，请告知顾客正在处理中，不要重复起草。",
+                "note": "该顾客已有同类未完结工单，请告知正在处理中，不要重复起草。",
             }
     except Exception:  # noqa: BLE001 - 数据库异常作为数据回给模型
         return {"error": "工单草稿创建失败，请稍后重试或转人工处理"}
