@@ -98,11 +98,14 @@ SSE 事件：
 
 ## 向量检索
 
-商品与工单在写入 MySQL 后同步嵌入（BGE-M3，1024 维）并写入 Milvus Lite。
-MySQL 是唯一事实来源，向量索引可随时重建。
+商品、工单与政策知识在写入 MySQL 后同步嵌入（BGE-M3，1024 维）并写入
+Milvus Lite。MySQL 是唯一事实来源，向量索引可随时重建。
 
 ```bash
-# 服务停止时
+# 导入政策文档（可重复执行）
+uv run python -m scripts.import_faq
+
+# 服务停止时重建索引
 uv run python -m scripts.reindex --drop
 
 # 服务运行中（Milvus Lite 独占文件，须在服务进程内重建）
@@ -110,6 +113,15 @@ curl -X POST "http://127.0.0.1:8000/api/admin/reindex?drop=true"
 ```
 
 `POST /api/admin/reindex` 当前无鉴权，生产部署前必须加保护。
+
+## 政策知识库
+
+`data/faq/` 存放 11 篇政策文档，覆盖退货、退款、物流、发票、价保、会员、
+投诉，按 `## ` 小节切分为 47 条知识。
+
+> **来源与许可**：文档取自第三方开源仓库，该仓库未附带 LICENSE，
+> 当前仅用于本地开发与演示，条款内容亦为虚构规则。
+> 上线前必须替换为本店真实政策。详见 [data/faq/README.md](data/faq/README.md)。
 
 ## 工单写入路径
 
