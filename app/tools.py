@@ -13,8 +13,10 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import ToolRuntime
 from pydantic import ValidationError
 
-from app import store
+from app import store, vector_store
 from app.schemas import ISSUE_TYPES, ProductQuery, WorkOrderCreate, WorkOrderQuery
+
+RELEVANCE_THRESHOLD = 0.5
 
 
 @dataclass
@@ -50,9 +52,32 @@ def lookup_product(
     except Exception:  # noqa: BLE001 - 数据库异常作为数据回给模型
         return {"error": "商品查询暂时不可用，请稍后重试"}
 
-    if not items:
-        return {"products": [], "note": "没有找到匹配的商品"}
-    return {"products": items, "count": len(items)}
+    if items:
+        return {"products": items, "count": len(items), "match": "exact"}
+
+    # 字面匹配不到时退到语义检索：顾客常说「杯子」，而库里的品名是
+    # 「马克杯」「保温杯」，字面上对不上，语义上却完全相关
+    if query.keyword:
+        semantic = _semantic_products(query.keyword, runtime.context.visitor_id)
+        if semantic:
+            return {"products": semantic, "count": len(semantic), "match": "semantic"}
+
+    return {"products": [], "note": "没有找到匹配的商品"}
+
+
+def _semantic_products(keyword: str, visitor_id: str) -> list[dict]:
+    hits = vector_store.search(keyword, visitor_id, top_k=5)
+    ids = [
+        h["source_id"]
+        for h in hits
+        if h["source"] == "product" and h["score"] >= RELEVANCE_THRESHOLD
+    ]
+    products = []
+    for product_id in ids:
+        found = store.search_products(product_id=product_id)
+        if found:
+            products.append(found[0])
+    return products
 
 
 @tool
@@ -167,4 +192,35 @@ def draft_work_order(
     }
 
 
-TOOLS = [lookup_product, list_my_orders, lookup_work_order, draft_work_order]
+@tool
+def search_knowledge(
+    runtime: ToolRuntime[AgentContext],
+    query: Annotated[str, "顾客问题的关键内容，用于语义检索，20 字以内"],
+    top_k: Annotated[int, "返回条数，默认 3，最多 5"] = 3,
+) -> dict:
+    """按语义检索店内知识与该顾客的历史工单。当顾客的问题涉及商品特征、
+    常见问题、或者需要参考过往工单时使用。结果只含语义相关度较高的条目，
+    相关度不足时返回空，表示没有可参考的资料——此时按常规客服话术回答，
+    不要臆测。"""
+    visitor_id = runtime.context.visitor_id
+    top_k = max(1, min(int(top_k or 3), 5))
+
+    # 嵌入是同步 HTTP 调用，放进工具里会阻塞事件循环，LangGraph 会自动丢线程池执行
+    hits = vector_store.search(query, visitor_id, top_k=top_k)
+    relevant = [h for h in hits if h["score"] >= RELEVANCE_THRESHOLD]
+
+    if not relevant:
+        return {
+            "results": [],
+            "note": "没有找到相关度足够的知识条目，请按常规客服话术回答，不要编造。",
+        }
+    return {"results": relevant, "count": len(relevant)}
+
+
+TOOLS = [
+    lookup_product,
+    list_my_orders,
+    lookup_work_order,
+    search_knowledge,
+    draft_work_order,
+]

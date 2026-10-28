@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field, ValidationError
 
-from app import store
+from app import store, vector_store
 from app.agent import build_agent
 from app.llm import ConfigError, get_llm
 from app.schemas import WorkOrderCreate
@@ -28,6 +28,7 @@ TOOL_LABELS = {
     "lookup_product": "商品",
     "list_my_orders": "订单",
     "lookup_work_order": "工单",
+    "search_knowledge": "知识库",
     "draft_work_order": "工单草稿",
 }
 
@@ -144,6 +145,18 @@ async def orders(visitor_id: str) -> dict:
     return {"orders": store.list_orders(visitor_id)}
 
 
+@app.post("/api/admin/reindex")
+async def reindex(drop: bool = False) -> dict:
+    """在服务进程内重建向量索引。
+
+    Milvus Lite 独占数据文件，外部脚本无法在服务运行时打开同一文件，
+    因此重建必须经由本接口触发。生产环境应加鉴权。
+    """
+    result = vector_store.rebuild_from_store(drop=drop)
+    logger.info("向量重建完成：%s", result)
+    return result
+
+
 class WorkOrderConfirm(BaseModel):
     draft_id: str = Field(min_length=1, max_length=64)
     visitor_id: str = Field(min_length=1, max_length=64)
@@ -228,10 +241,20 @@ async def confirm_work_order(req: WorkOrderConfirm) -> dict:
         logger.exception("提交工单失败")
         raise HTTPException(status_code=500, detail="提交失败，请稍后重试") from exc
 
+    _index_work_order(req.visitor_id, work_order_no)
+
     return {
         "created": True,
         "work_order": store.get_work_order(req.visitor_id, work_order_no),
     }
+
+
+def _index_work_order(visitor_id: str, work_order_no: str) -> None:
+    """双写到向量库。失败只记日志——MySQL 已写入，索引可重建。"""
+    row = store.get_work_order_row(visitor_id, work_order_no)
+    if row is None:
+        return
+    vector_store.upsert_documents([vector_store.work_order_document(row)])
 
 
 @app.post("/api/chat")
