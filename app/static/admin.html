@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>知识库管理 · ShopPilot</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body class="admin-body">
+  <div class="admin">
+    <header class="admin-head">
+      <h1>知识库管理</h1>
+      <div class="admin-actions">
+        <span class="admin-count" id="count"></span>
+        <button class="btn" id="resyncBtn" type="button">重建索引</button>
+        <button class="btn btn-primary" id="newBtn" type="button">新建知识</button>
+        <a class="btn btn-link" href="/">返回对话</a>
+      </div>
+    </header>
+
+    <div class="admin-main">
+      <aside class="admin-side">
+        <nav class="cat-list" id="catList" aria-label="分类"></nav>
+        <div class="item-list" id="itemList"></div>
+      </aside>
+
+      <section class="admin-editor" id="editor">
+        <div class="editor-empty" id="editorEmpty">
+          <p>选择左侧的条目进行编辑，或点击「新建知识」。</p>
+        </div>
+
+        <form class="editor-form" id="editorForm" hidden>
+          <div class="field">
+            <label for="fTitle">标题</label>
+            <input id="fTitle" type="text" maxlength="64" required>
+            <span class="field-meta">2–64 字，如「七天无理由退货规则」</span>
+          </div>
+
+          <div class="field">
+            <label for="fSection">小节名</label>
+            <input id="fSection" type="text" maxlength="64" required>
+            <span class="field-meta">2–64 字，参与检索，建议写具体（「运费承担」优于「其他说明」）</span>
+          </div>
+
+          <div class="field">
+            <label for="fCategory">分类</label>
+            <input id="fCategory" type="text" maxlength="32" list="catOptions" required>
+            <datalist id="catOptions"></datalist>
+            <span class="field-meta">可从已有分类中选择，或输入新的</span>
+          </div>
+
+          <div class="field">
+            <label for="fContent">正文</label>
+            <textarea id="fContent" rows="14" maxlength="2000" required></textarea>
+            <span class="field-meta">
+              <span id="contentLen">0</span> / 2000 字，至少 20 字
+            </span>
+          </div>
+
+          <p class="editor-hint" id="editorHint" hidden></p>
+
+          <div class="editor-actions">
+            <button class="btn btn-primary" type="submit" id="saveBtn">保存</button>
+            <button class="btn" type="button" id="toggleBtn" hidden>停用</button>
+            <button class="btn btn-danger" type="button" id="deleteBtn" hidden>删除</button>
+            <span class="editor-status" id="editorStatus"></span>
+          </div>
+        </form>
+      </section>
+    </div>
+  </div>
+  <script type="module" src="/admin.js"></script>
+</body>
+</html>

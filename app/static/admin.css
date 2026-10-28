@@ -1,0 +1,246 @@
+/* 知识库管理页，独立于聊天页。复用 style.css 的变量与基础样式。 */
+
+.admin-body {
+  background: var(--bg);
+  margin: 0;
+}
+
+.admin {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 1280px;
+  margin: 0 auto;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+.admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-head h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-count {
+  font-size: 13px;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+.btn {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn:hover { background: var(--hover); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--user);
+  border-color: var(--user);
+  color: #fff;
+}
+.btn-primary:hover { background: #2557bd; }
+
+.btn-danger { color: var(--error); border-color: #f0c9c9; }
+.btn-danger:hover { background: #fdeaea; }
+
+.btn-link { color: var(--muted); }
+
+/* ---------- 主体 ---------- */
+
+.admin-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-side {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  flex: 0 0 320px;
+  border-right: 1px solid var(--line);
+  background: #fbfcfd;
+}
+
+.cat-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cat-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cat-chip:hover { background: var(--hover); }
+.cat-chip.active { background: var(--active); color: var(--ink); border-color: #c3d5f5; }
+
+.item-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover { background: var(--hover); }
+.item.active { background: var(--active); }
+
+.item-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.item-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.item.disabled .item-title { color: var(--muted); text-decoration: line-through; }
+
+/* ---------- 编辑器 ---------- */
+
+.admin-editor {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px;
+  min-width: 0;
+}
+
+.editor-empty {
+  color: var(--muted);
+  font-size: 14px;
+  padding-top: 40px;
+  text-align: center;
+}
+
+.editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 720px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.field input,
+.field textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--bg);
+  outline: none;
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: #b9c6e4;
+  background: #fff;
+}
+
+.field textarea { resize: vertical; line-height: 1.6; }
+
+.field-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.editor-hint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff8e8;
+  color: #8a5d12;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.editor-hint[hidden] { display: none; }
+.editor-hint.error { background: #fdeaea; color: var(--error); }
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.editor-status {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 860px) {
+  .admin-main { flex-direction: column; }
+  .admin-side {
+    width: auto;
+    flex: none;
+    max-height: 40dvh;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}

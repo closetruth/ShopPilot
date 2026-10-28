@@ -53,9 +53,11 @@ CREATE TABLE IF NOT EXISTS faq_documents (
     section     VARCHAR(128)  NOT NULL,
     content     TEXT          NOT NULL,
     source      VARCHAR(256)  NOT NULL DEFAULT '',
+    enabled     TINYINT(1)    NOT NULL DEFAULT 1,
     updated_at  DATETIME(6)   NOT NULL,
     KEY idx_faq_doc (doc_id),
-    KEY idx_faq_category (category)
+    KEY idx_faq_category (category),
+    KEY idx_faq_enabled (enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -141,7 +143,10 @@ def _ensure_columns(cur) -> None:
             ("issue_type", "VARCHAR(32) NOT NULL DEFAULT '其他'"),
             ("priority", "VARCHAR(16) NOT NULL DEFAULT '普通'"),
             ("source", "VARCHAR(16) NOT NULL DEFAULT 'ai'"),
-        ]
+        ],
+        "faq_documents": [
+            ("enabled", "TINYINT(1) NOT NULL DEFAULT 1"),
+        ],
     }
     for table, columns in required.items():
         cur.execute(

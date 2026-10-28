@@ -65,8 +65,9 @@ def lookup_product(
     return {
         "products": everything,
         "count": len(everything),
-        "note": f"没有匹配「{query.keyword}」的商品，以上是全部在售商品，"
-        "请据此判断是否有顾客想要的东西。",
+        "note": f"没有匹配「{query.keyword}」的商品，以上是全部在售商品。"
+        "若顾客问的是使用规范、保养、存放等政策类问题而非买货，"
+        "改用 search_knowledge。",
     }
 
 

@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field, ValidationError
@@ -155,6 +155,95 @@ async def reindex(drop: bool = False) -> dict:
     result = vector_store.rebuild_from_store(drop=drop)
     logger.info("向量重建完成：%s", result)
     return result
+
+
+# ---------- 知识库管理 ----------
+# 暂不鉴权，仅用于本地开发。上线前必须加保护。
+
+
+class FaqPayload(BaseModel):
+    title: str = Field(min_length=2, max_length=64)
+    section: str = Field(min_length=2, max_length=64)
+    category: str = Field(min_length=1, max_length=32)
+    content: str = Field(min_length=20, max_length=2000)
+
+
+def _index_faq(faq_id: str) -> None:
+    """把单条知识写入向量库。失败只记日志——MySQL 已写入，可重建。"""
+    row = store.faq_by_id(faq_id)
+    if row is None or not row["enabled"]:
+        return
+    vector_store.upsert_documents([vector_store.faq_document(row)])
+
+
+@app.get("/api/admin/faq")
+async def admin_list_faq(category: str | None = None) -> dict:
+    return {"items": store.list_faq(category)}
+
+
+@app.get("/api/admin/faq/categories")
+async def admin_faq_categories() -> dict:
+    return {"categories": store.faq_categories()}
+
+
+@app.get("/api/admin/faq/search")
+async def admin_debug_search(q: str, top_k: int = 5) -> dict:
+    """调试用：查看检索原始分数，绕过阈值过滤。
+
+    录入界面靠它排查「新建后搜不到」到底是没进索引，还是分数不够。
+    """
+    hits = vector_store.search(q, "", top_k=top_k)
+    return {"query": q, "hits": hits}
+
+
+@app.post("/api/admin/faq")
+async def admin_create_faq(payload: FaqPayload) -> dict:
+    faq_id = store.create_faq_document(
+        title=payload.title,
+        section=payload.section,
+        category=payload.category,
+        content=payload.content,
+    )
+    _index_faq(faq_id)
+    return {"id": faq_id, "item": store.faq_by_id(faq_id)}
+
+
+@app.put("/api/admin/faq/{faq_id}")
+async def admin_update_faq(faq_id: str, payload: FaqPayload) -> dict:
+    if not store.update_faq_document(
+        faq_id,
+        title=payload.title,
+        section=payload.section,
+        category=payload.category,
+        content=payload.content,
+    ):
+        raise HTTPException(status_code=404, detail="知识不存在")
+    _index_faq(faq_id)
+    return {"item": store.faq_by_id(faq_id)}
+
+
+@app.post("/api/admin/faq/{faq_id}/toggle")
+async def admin_toggle_faq(faq_id: str, enabled: bool) -> dict:
+    if not store.set_faq_enabled(faq_id, enabled):
+        raise HTTPException(status_code=404, detail="知识不存在")
+    if enabled:
+        _index_faq(faq_id)
+    else:
+        vector_store.delete_by_source("faq", faq_id)
+    return {"item": store.faq_by_id(faq_id)}
+
+
+@app.delete("/api/admin/faq/{faq_id}")
+async def admin_delete_faq(faq_id: str) -> dict:
+    if not store.delete_faq_document(faq_id):
+        raise HTTPException(status_code=404, detail="知识不存在")
+    vector_store.delete_by_source("faq", faq_id)
+    return {"ok": True}
+
+
+@app.get("/admin")
+async def admin_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "admin.html")
 
 
 class WorkOrderConfirm(BaseModel):

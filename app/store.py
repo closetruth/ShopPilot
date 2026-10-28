@@ -87,6 +87,12 @@ purge_expired_drafts = commerce.purge_expired_drafts
 # ---------- FAQ ----------
 
 upsert_faq_document = knowledge.upsert_document
+create_faq_document = knowledge.create_document
+update_faq_document = knowledge.update_document
+set_faq_enabled = knowledge.set_enabled
+delete_faq_document = knowledge.delete_document
 all_faq_for_index = knowledge.all_for_index
 faq_by_id = knowledge.by_id
 list_faq = knowledge.list_by_category
+faq_categories = knowledge.categories
+delete_stale_faq = knowledge.delete_missing

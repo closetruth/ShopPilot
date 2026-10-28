@@ -22,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-from app import store
+from app import store, vector_store
 
 FAQ_DIR = Path("data/faq")
 
@@ -100,8 +100,24 @@ def main() -> None:
     for doc in docs:
         store.upsert_faq_document(doc)
 
-    files = len({d["source"] for d in docs})
+    # 文件里已删掉的小节要同步从库里移除，否则作废的政策仍会被检索到。
+    # 只清理来自文件的条目（source 为文件名），Web 录入的 source='web' 不受影响。
+    sources = {d["source"] for d in docs}
+    removed = 0
+    for source in sources:
+        keep = [d["id"] for d in docs if d["source"] == source]
+        stale = store.delete_stale_faq(source, keep)
+        for faq_id in stale:
+            vector_store.delete_by_source("faq", faq_id)
+        removed += len(stale)
+
+    files = len(sources)
     print(f"已导入 {files} 个文件，共 {len(docs)} 条知识小节")
+    if removed:
+        print(f"已移除文件中不再存在的 {removed} 条")
+    print("提示：内容变更需重建向量索引才生效——")
+    print("      uv run python -m scripts.reindex --drop")
+    print("      或服务运行中调用 POST /api/admin/reindex?drop=true")
 
 
 if __name__ == "__main__":
