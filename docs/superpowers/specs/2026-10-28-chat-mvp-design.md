@@ -135,3 +135,44 @@ CREATE INDEX idx_messages_conv ON messages(conversation_id, id);
 
 - HTML/CSS 的具体版式与配色
 - 单测覆盖到哪几个函数（最低要求：store 的读写与历史截断）
+
+## 补充：顾客自管多会话（2026-10-28）
+
+### 用户故事
+
+顾客打开页面与 AI 客服对话，左侧栏只显示**他自己**的历史会话，按最近活跃排序，
+标题自动取该会话里顾客的第一句话。可新建对话、可原地切换回旧对话继续聊。
+看不到其他顾客的会话。
+
+### 身份模型
+
+- `visitor_id`：首次访问时生成，代表「这个浏览器上的人」
+- `conversation_id`：每条会话唯一，属于某个 `visitor_id`
+- 两者存在**同一个 localStorage key**（`shoppilot.session`，JSON），一起存一起丢。
+  解析失败或缺失时整体重建，不给恢复路径。
+- 换设备或清缓存 = 新顾客，旧对话不可找回。**这是明确接受的取舍。**
+
+### 数据模型变更
+
+`conversations` 增加 `visitor_id TEXT NOT NULL` 与对应索引。
+本地测试数据无保留价值，直接重建库，不做迁移。
+
+### 接口变更
+
+| 接口 | 变更 |
+|---|---|
+| `GET /api/conversations?visitor_id=` | 新增，只返回该 visitor 的会话 |
+| `GET /api/history` | 增加 `visitor_id` 参数，越权访问返回 404 |
+| `POST /api/chat` | 请求体增加 `visitor_id`；新建会话时绑定 |
+| `DELETE /api/conversations/{id}` | 不做 |
+
+### 前端行为
+
+- 左栏：新建对话按钮 + 会话列表 + 当前项高亮
+- 切换会话：原地清空消息区并载入目标会话历史，不整页刷新
+- 新对话不立即建库，等第一条消息时由后端创建，避免空会话堆积
+
+### 非目标
+
+删除、重命名、账号体系、跨设备身份。
+

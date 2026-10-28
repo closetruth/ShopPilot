@@ -1,17 +1,51 @@
-const STORAGE_KEY = "shoppilot.conversation_id";
+const STORAGE_KEY = "shoppilot.session";
 
 const messagesEl = document.getElementById("messages");
 const formEl = document.getElementById("composer");
 const inputEl = document.getElementById("input");
 const sendEl = document.getElementById("send");
 const statusEl = document.getElementById("status");
+const convListEl = document.getElementById("convList");
+const newChatEl = document.getElementById("newChat");
+const sidebarEl = document.getElementById("sidebar");
+const toggleEl = document.getElementById("toggle");
 
-let conversationId = localStorage.getItem(STORAGE_KEY) || null;
+let session = loadSession();
+let conversationId = session.conversation_id || null;
 let busy = false;
+
+/* ---------- 会话状态 ---------- */
+
+function loadSession() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (raw && typeof raw.visitor_id === "string" && raw.visitor_id) {
+      return {
+        visitor_id: raw.visitor_id,
+        conversation_id:
+          typeof raw.conversation_id === "string" ? raw.conversation_id : null,
+      };
+    }
+  } catch {
+    /* 解析失败按新顾客处理 */
+  }
+  return { visitor_id: crypto.randomUUID(), conversation_id: null };
+}
+
+function saveSession() {
+  session.conversation_id = conversationId;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+}
+
+/* ---------- 渲染 ---------- */
 
 function setStatus(text, cls) {
   statusEl.textContent = text;
   statusEl.className = "status" + (cls ? " " + cls : "");
+}
+
+function clearMessages() {
+  messagesEl.replaceChildren();
 }
 
 function addRow(role, text = "") {
@@ -31,6 +65,102 @@ function setText(bubble, text) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+function renderGreeting() {
+  addRow("bot", "您好，我是店铺客服。请问有什么可以帮您？");
+}
+
+function renderConversations(list) {
+  convListEl.replaceChildren();
+  if (!list.length) {
+    const empty = document.createElement("div");
+    empty.className = "conv-empty";
+    empty.textContent = "还没有对话记录";
+    convListEl.appendChild(empty);
+    return;
+  }
+  for (const c of list) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "conv-item" + (c.id === conversationId ? " active" : "");
+    btn.textContent = c.title;
+    btn.title = c.title;
+    btn.addEventListener("click", () => selectConversation(c.id));
+    convListEl.appendChild(btn);
+  }
+}
+
+async function loadConversations() {
+  try {
+    const res = await fetch(
+      "/api/conversations?visitor_id=" + encodeURIComponent(session.visitor_id)
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    renderConversations(data.conversations);
+  } catch {
+    /* 列表加载失败不影响当前对话 */
+  }
+}
+
+async function loadHistory() {
+  clearMessages();
+  if (!conversationId) {
+    renderGreeting();
+    return;
+  }
+  try {
+    const res = await fetch(
+      "/api/history?conversation_id=" +
+        encodeURIComponent(conversationId) +
+        "&visitor_id=" +
+        encodeURIComponent(session.visitor_id)
+    );
+    if (res.status === 404) {
+      conversationId = null;
+      saveSession();
+      renderGreeting();
+      return;
+    }
+    if (!res.ok) {
+      renderGreeting();
+      return;
+    }
+    const data = await res.json();
+    if (!data.messages.length) {
+      renderGreeting();
+      return;
+    }
+    for (const m of data.messages) {
+      addRow(m.role === "user" ? "me" : "bot", m.content);
+    }
+  } catch {
+    renderGreeting();
+  }
+}
+
+/* ---------- 交互 ---------- */
+
+async function selectConversation(id) {
+  if (busy) return;
+  conversationId = id;
+  saveSession();
+  await loadHistory();
+  await loadConversations();
+  sidebarEl.classList.remove("open");
+  inputEl.focus();
+}
+
+function startNewChat() {
+  if (busy) return;
+  conversationId = null;
+  saveSession();
+  clearMessages();
+  renderGreeting();
+  loadConversations();
+  sidebarEl.classList.remove("open");
+  inputEl.focus();
+}
+
 function autoGrow() {
   inputEl.style.height = "auto";
   inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + "px";
@@ -44,27 +174,8 @@ inputEl.addEventListener("keydown", (e) => {
   }
 });
 
-async function restoreHistory() {
-  if (!conversationId) return;
-  try {
-    const res = await fetch(
-      "/api/history?conversation_id=" + encodeURIComponent(conversationId)
-    );
-    if (!res.ok) {
-      if (res.status === 404) {
-        conversationId = null;
-        localStorage.removeItem(STORAGE_KEY);
-      }
-      return;
-    }
-    const data = await res.json();
-    for (const m of data.messages) {
-      addRow(m.role === "user" ? "me" : "bot", m.content);
-    }
-  } catch {
-    /* 历史加载失败不影响新对话 */
-  }
-}
+newChatEl.addEventListener("click", startNewChat);
+toggleEl.addEventListener("click", () => sidebarEl.classList.toggle("open"));
 
 async function send(text) {
   busy = true;
@@ -77,12 +188,17 @@ async function send(text) {
 
   let acc = "";
   let failed = false;
+  let createdNew = false;
 
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, conversation_id: conversationId }),
+      body: JSON.stringify({
+        message: text,
+        visitor_id: session.visitor_id,
+        conversation_id: conversationId,
+      }),
     });
 
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -115,8 +231,9 @@ async function send(text) {
         }
 
         if (msg.conversation_id) {
+          if (!conversationId) createdNew = true;
           conversationId = msg.conversation_id;
-          localStorage.setItem(STORAGE_KEY, conversationId);
+          saveSession();
         } else if (msg.delta) {
           acc += msg.delta;
           setText(bubble, acc);
@@ -137,6 +254,7 @@ async function send(text) {
     busy = false;
     sendEl.disabled = false;
     setStatus("在线");
+    if (createdNew) loadConversations();
     inputEl.focus();
   }
 }
@@ -150,9 +268,8 @@ formEl.addEventListener("submit", (e) => {
   send(text);
 });
 
-restoreHistory().then(() => {
-  if (!messagesEl.children.length) {
-    addRow("bot", "您好，我是店铺客服。请问有什么可以帮您？");
-  }
-  inputEl.focus();
-});
+/* ---------- 启动 ---------- */
+
+saveSession();
+loadConversations();
+loadHistory().then(() => inputEl.focus());

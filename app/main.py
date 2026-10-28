@@ -39,6 +39,7 @@ app = FastAPI(title="ShopPilot", lifespan=lifespan)
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
+    visitor_id: str = Field(min_length=1, max_length=64)
     conversation_id: str | None = None
 
 
@@ -69,17 +70,24 @@ async def health() -> dict:
 
 
 @app.get("/api/history")
-async def history(conversation_id: str, limit: int = 200) -> dict:
-    if not store.conversation_exists(conversation_id):
+async def history(conversation_id: str, visitor_id: str, limit: int = 200) -> dict:
+    if not store.conversation_owned_by(conversation_id, visitor_id):
         raise HTTPException(status_code=404, detail="会话不存在")
     return {"messages": store.load_history(conversation_id, limit)}
+
+
+@app.get("/api/conversations")
+async def conversations(visitor_id: str) -> dict:
+    return {"conversations": store.list_conversations(visitor_id)}
 
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest) -> StreamingResponse:
     conversation_id = req.conversation_id
-    if not conversation_id or not store.conversation_exists(conversation_id):
-        conversation_id = store.create_conversation()
+    if not conversation_id or not store.conversation_owned_by(
+        conversation_id, req.visitor_id
+    ):
+        conversation_id = store.create_conversation(req.visitor_id)
 
     history_limit = int(os.getenv("HISTORY_LIMIT", "20"))
     history = store.load_history(conversation_id, history_limit)

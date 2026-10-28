@@ -8,20 +8,32 @@
 </head>
 <body>
   <div class="app">
-    <header class="header">
-      <div class="avatar">客</div>
-      <div class="header-text">
-        <h1>店铺客服</h1>
-        <span class="status" id="status">在线</span>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <button class="new-chat" id="newChat" type="button">
+          <span aria-hidden="true">+</span> 新对话
+        </button>
       </div>
-    </header>
+      <nav class="conv-list" id="convList" aria-label="历史对话"></nav>
+    </aside>
 
-    <main class="messages" id="messages" aria-live="polite"></main>
+    <section class="main">
+      <header class="header">
+        <button class="toggle" id="toggle" type="button" aria-label="切换侧栏">☰</button>
+        <div class="avatar">客</div>
+        <div class="header-text">
+          <h1>店铺客服</h1>
+          <span class="status" id="status">在线</span>
+        </div>
+      </header>
 
-    <form class="composer" id="composer">
-      <textarea id="input" rows="1" placeholder="请输入问题…" autocomplete="off"></textarea>
-      <button type="submit" id="send" aria-label="发送">发送</button>
-    </form>
+      <main class="messages" id="messages" aria-live="polite"></main>
+
+      <form class="composer" id="composer">
+        <textarea id="input" rows="1" placeholder="请输入问题…" autocomplete="off"></textarea>
+        <button type="submit" id="send" aria-label="发送">发送</button>
+      </form>
+    </section>
   </div>
   <script src="/app.js"></script>
 </body>
