@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>店铺客服</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="avatar">客</div>
+      <div class="header-text">
+        <h1>店铺客服</h1>
+        <span class="status" id="status">在线</span>
+      </div>
+    </header>
+
+    <main class="messages" id="messages" aria-live="polite"></main>
+
+    <form class="composer" id="composer">
+      <textarea id="input" rows="1" placeholder="请输入问题…" autocomplete="off"></textarea>
+      <button type="submit" id="send" aria-label="发送">发送</button>
+    </form>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
