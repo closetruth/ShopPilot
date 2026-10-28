@@ -210,38 +210,56 @@ def test_visitor_has_order(visitor):
     assert not store.visitor_has_order("someone-else", "ORDER20260001")
 
 
+def _insert_order(visitor_id: str, order_no: str, product_id: str | None = None):
+    """测试自备订单数据，不依赖 seed 的共享演示数据。"""
+    import pymysql
+
+    conn = pymysql.connect(
+        host="127.0.0.1", port=3307, user="shoppilot",
+        password="shoppilot", database="shoppilot",
+    )
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO orders"
+                " (order_no, visitor_id, product_id, quantity, amount_cents, created_at)"
+                " VALUES (%s, %s, %s, 1, 5900, NOW(6))",
+                (order_no, visitor_id, product_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def test_list_orders_includes_work_orders(visitor):
-    from scripts.seed import DEMO_VISITOR
+    _insert_order(visitor, "ORDER20991001", "p-mug-blue")
+    _insert_order(visitor, "ORDER20991002", "p-mug-white")
+    store.create_work_order(
+        visitor, "ORDER20991001", "运输破损", "收到时杯口有裂纹外包装完好"
+    )
 
-    orders = store.list_orders(DEMO_VISITOR)
-    numbers = [o["order_no"] for o in orders]
-    assert "ORDER20260001" in numbers
-    assert "ORDER20260009" in numbers  # 未提过工单的订单也要列出
+    orders = {o["order_no"]: o for o in store.list_orders(visitor)}
+    assert set(orders) == {"ORDER20991001", "ORDER20991002"}
 
-    target = next(o for o in orders if o["order_no"] == "ORDER20260001")
-    assert target["product"] == "青花瓷马克杯（蓝色）"
-    assert target["work_orders"]
-    assert target["work_orders"][0]["status"] == "待处理"
+    with_wo = orders["ORDER20991001"]
+    assert with_wo["product"] == "青花瓷马克杯（蓝色）"
+    assert with_wo["work_orders"]
+    assert with_wo["work_orders"][0]["status"] == "待处理"
 
-    fresh = next(o for o in orders if o["order_no"] == "ORDER20260009")
+    fresh = orders["ORDER20991002"]
     assert fresh["work_orders"] == []
 
 
 def test_list_orders_scoped_to_visitor(visitor):
-    from scripts.seed import DEMO_VISITOR
-
-    assert all(
-        o["order_no"] != "ORDER20260003" for o in store.list_orders(DEMO_VISITOR)
-    )
-    other = store.list_orders("another-visitor")
-    assert [o["order_no"] for o in other] == ["ORDER20260003"]
+    _insert_order(visitor, "ORDER20991003")
+    assert [o["order_no"] for o in store.list_orders(visitor)] == ["ORDER20991003"]
+    assert store.list_orders("someone-else") == []
 
 
 def test_get_order_scoped(visitor):
-    from scripts.seed import DEMO_VISITOR
-
-    assert store.get_order(DEMO_VISITOR, "ORDER20260009") is not None
-    assert store.get_order("another-visitor", "ORDER20260009") is None
+    _insert_order(visitor, "ORDER20991004")
+    assert store.get_order(visitor, "ORDER20991004") is not None
+    assert store.get_order("another-visitor", "ORDER20991004") is None
 
 
 def test_draft_does_not_create_work_order(visitor):
