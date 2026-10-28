@@ -60,6 +60,10 @@ plans/         实施计划
 - `POST /api/chat` — 请求 `{"message": "...", "visitor_id": "...", "conversation_id": "可选"}`，返回 SSE 流
 - `GET /api/history?conversation_id=...&visitor_id=...` — 拉取历史，越权返回 404
 - `GET /api/conversations?visitor_id=...` — 该访客的会话列表
+- `GET /api/orders?visitor_id=...` — 该访客的订单，含已关联工单
+- `GET /api/work-orders?visitor_id=...` — 该访客的工单
+- `POST /api/work-orders/drafts` — 顾客主动提单时建草稿
+- `POST /api/work-orders` — 凭 `draft_id` 确认提交（只接受 id，不接受内容）
 - `GET /health` — 健康检查
 
 SSE 事件：
@@ -68,7 +72,8 @@ SSE 事件：
 |---|---|
 | `{"conversation_id": "..."}` | 会话 ID（首个事件） |
 | `{"delta": "..."}` | 文本增量 |
-| `{"tool": "lookup_product", "label": "商品", "status": "start\|done"}` | 工具调用状态 |
+| `{"tool": "...", "label": "...", "status": "start\|done"}` | 工具调用状态 |
+| `{"work_order_draft": {...}}` | 待确认工单草稿，由后端直推 |
 | `[DONE]` | 正常结束 |
 | `{"error": "..."}` | 出错 |
 
@@ -77,10 +82,20 @@ SSE 事件：
 | 工具 | 能力 | 约束 |
 |---|---|---|
 | `lookup_product` | 按关键词或 ID 查商品价格、颜色、库存 | 不返回成本价等内部字段 |
-| `lookup_work_order` | 按订单号查工单进度 | 强制注入当前 visitor_id，只能查本人；查不到时不区分「不存在」与「不属于你」 |
-| `create_work_order` | 提交售后工单 | 需顾客明确同意；系统内无此订单归属时拒绝；同单同类型未完结不重复建 |
+| `list_my_orders` | 列出当前顾客的订单 | 无参数，只返回本人订单 |
+| `lookup_work_order` | 按订单号查工单进度 | 只能查本人；查不到时不区分「不存在」与「不属于你」 |
+| `draft_work_order` | 起草待确认的工单 | **不写库**，仅生成草稿供前端确认 |
 
 参数经 Pydantic 校验，非法时返回结构化错误让模型自行纠正，不中断对话。
+
+## 工单写入路径
+
+AI 无法直接建单。工单只可能由顾客点击产生，两条路径：
+
+1. **面板提单**：我的订单 → 选订单 → 填类型与描述 → 提交
+2. **聊天起草**：AI 起草 → 界面出现确认卡片 → 顾客点「确认提交」
+
+草稿存库（30 分钟过期），确认接口只接受 `draft_id`，内容不可篡改。
 
 ## 暂不包含
 
