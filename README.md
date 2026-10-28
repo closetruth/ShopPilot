@@ -49,15 +49,25 @@ uv run pytest
 app/
   main.py      FastAPI：SSE 对话、历史、会话列表、静态托管
   agent.py     LangGraph ReAct Agent 构建
-  tools.py     lookup_product / lookup_work_order
+  tools.py     工具定义：查商品 / 查订单 / 查工单 / 查政策 / 起草工单
   schemas.py   工具参数校验模型
   llm.py       ChatOpenAI 工厂（OpenAI 兼容）
-  store.py     MySQL 读写：会话、消息、商品、工单
+  embedding.py BGE-M3 嵌入（硅基流动）
+  vector_store.py Milvus Lite 索引与检索（仅 FAQ）
+  db.py        MySQL 连接、建表、旧表补列
+  repo/
+    chats.py     会话与消息
+    commerce.py  商品、订单、工单、工单草稿
+    knowledge.py FAQ 政策知识
+  store.py     上述仓储的转发门面，调用方统一从这里访问
   prompt.py    客服人设与工具使用规则
   static/      聊天页面
 scripts/
   seed.py                    演示数据（幂等）
+  import_faq.py              政策文档导入（幂等）
+  reindex.py                 向量索引重建
   migrate_sqlite_to_mysql.py 旧 SQLite 数据导入（幂等，支持 --dry-run）
+data/faq/      政策文档（随仓库版本控制）
 docs/          设计文档与提示词
 plans/         实施计划
 ```
