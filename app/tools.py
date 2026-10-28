@@ -14,7 +14,7 @@ from langgraph.prebuilt import ToolRuntime
 from pydantic import ValidationError
 
 from app import store
-from app.schemas import ProductQuery, WorkOrderQuery
+from app.schemas import ISSUE_TYPES, ProductQuery, WorkOrderCreate, WorkOrderQuery
 
 
 @dataclass
@@ -82,4 +82,65 @@ def lookup_work_order(
     return {"found": True, "work_order": order}
 
 
-TOOLS = [lookup_product, lookup_work_order]
+@tool
+def create_work_order(
+    runtime: ToolRuntime[AgentContext],
+    order_no: Annotated[str, "订单号，8-32 位大写字母或数字"],
+    issue_type: Annotated[str, "问题类型，必须是：运输破损 / 发货延迟 / 质量问题 / 退换货 / 其他"],
+    description: Annotated[str, "顾客描述的具体问题，需包含可核实细节，10-500 字"],
+) -> dict:
+    """为顾客提交售后工单。仅在顾客已明确同意提交后才可调用：
+    你必须先在对话中复述订单号、问题类型与问题描述，得到顾客「确认」「可以」
+    等明确答复后才能调用本工具。顾客未表态、犹豫或说「先不用」时禁止调用。
+
+    同一顾客同一订单同一类型已有未完结工单时不会重复创建，会返回既有工单。"""
+    try:
+        query = WorkOrderCreate(
+            order_no=order_no, issue_type=issue_type, description=description
+        )
+    except ValidationError as exc:
+        return _validation_error(exc)
+
+    visitor_id = runtime.context.visitor_id
+
+    try:
+        if not store.visitor_has_order(visitor_id, query.order_no):
+            # 与查单一致，不区分「订单不存在」与「不属于当前顾客」
+            return {
+                "created": False,
+                "reason": "order_not_found",
+                "note": "系统中查不到该订单号属于当前顾客，无法建单。"
+                "请顾客核对订单号，或说明需要人工核实。不要改为直接建单。",
+            }
+
+        existing = store.find_open_work_order(
+            visitor_id, query.order_no, query.issue_type
+        )
+        if existing is not None:
+            return {
+                "created": False,
+                "reason": "duplicate",
+                "existing_work_order_no": existing["id"],
+                "existing_status": existing["status"],
+                "note": "该订单已有同类未完结工单，请告知顾客正在处理中，不要重复提交。",
+            }
+
+        work_order_no = store.create_work_order(
+            visitor_id=visitor_id,
+            order_no=query.order_no,
+            issue_type=query.issue_type,
+            description=query.description,
+        )
+    except Exception:  # noqa: BLE001 - 数据库异常作为数据回给模型
+        return {"error": "工单提交失败，请稍后重试或转人工处理"}
+
+    return {
+        "created": True,
+        "work_order_no": work_order_no,
+        "status": "待处理",
+        "issue_type": query.issue_type,
+        "note": "已提交。请告知顾客工单号与当前状态，不要承诺具体处理时限。",
+    }
+
+
+TOOLS = [lookup_product, lookup_work_order, create_work_order]

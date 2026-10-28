@@ -142,3 +142,68 @@ def test_find_work_order_not_owned_returns_none(visitor):
 
     assert store.find_work_order("someone-else", "ORDER20260001") is None
     assert store.find_work_order(DEMO_VISITOR, "ORDER20260003") is None
+
+
+def test_create_work_order_and_find_it(visitor):
+    work_order_no = store.create_work_order(
+        visitor, "ORDER20990001", "运输破损", "收到时杯身有裂纹，外包装压扁"
+    )
+    assert work_order_no.startswith("WO")
+
+    found = store.find_work_order(visitor, "ORDER20990001")
+    assert found is not None
+    assert found["status"] == "待处理"
+    assert found["issue"] == "收到时杯身有裂纹，外包装压扁"
+
+
+def test_create_work_order_forces_server_side_fields(visitor):
+    import pymysql
+
+    work_order_no = store.create_work_order(
+        visitor, "ORDER20990002", "质量问题", "内胆涂层脱落，使用一周后出现"
+    )
+    conn = pymysql.connect(
+        host="127.0.0.1", port=3307, user="shoppilot",
+        password="shoppilot", database="shoppilot",
+        cursorclass=pymysql.cursors.DictCursor,
+    )
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT visitor_id, status, source, priority"
+                " FROM work_orders WHERE id = %s",
+                (work_order_no,),
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+
+    assert row["visitor_id"] == visitor
+    assert row["status"] == "待处理"
+    assert row["source"] == "ai"
+    assert row["priority"] == "普通"
+
+
+def test_find_open_work_order_detects_duplicate(visitor):
+    store.create_work_order(
+        visitor, "ORDER20990003", "发货延迟", "下单五天仍未发货，物流无更新"
+    )
+    existing = store.find_open_work_order(visitor, "ORDER20990003", "发货延迟")
+    assert existing is not None
+    assert existing["status"] == "待处理"
+
+
+def test_find_open_work_order_different_type_is_not_duplicate(visitor):
+    store.create_work_order(
+        visitor, "ORDER20990004", "退换货", "尺寸不合适申请退货处理"
+    )
+    assert store.find_open_work_order(visitor, "ORDER20990004", "发货延迟") is None
+
+
+def test_visitor_has_order(visitor):
+    store.create_work_order(
+        visitor, "ORDER20990005", "其他", "顾客咨询售后流程需要记录跟进"
+    )
+    assert store.visitor_has_order(visitor, "ORDER20990005")
+    assert not store.visitor_has_order(visitor, "ORDER20990006")
+    assert not store.visitor_has_order("someone-else", "ORDER20990005")

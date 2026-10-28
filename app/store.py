@@ -49,12 +49,16 @@ CREATE TABLE IF NOT EXISTS work_orders (
     id          VARCHAR(32)   NOT NULL PRIMARY KEY,
     visitor_id  VARCHAR(64)   NOT NULL,
     order_no    VARCHAR(32)   NOT NULL,
-    product_id  VARCHAR(32)   NOT NULL,
+    product_id  VARCHAR(32)   NULL,
     status      VARCHAR(32)   NOT NULL,
     issue       TEXT          NOT NULL,
+    issue_type  VARCHAR(32)   NOT NULL DEFAULT '其他',
+    priority    VARCHAR(16)   NOT NULL DEFAULT '普通',
+    source      VARCHAR(16)   NOT NULL DEFAULT 'ai',
     created_at  DATETIME(6)   NOT NULL,
     updated_at  DATETIME(6)   NOT NULL,
-    KEY idx_orders_visitor_order (visitor_id, order_no)
+    KEY idx_orders_visitor_order (visitor_id, order_no),
+    KEY idx_orders_dedupe (visitor_id, order_no, issue_type, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """
 
@@ -91,6 +95,38 @@ def init_db() -> None:
             for stmt in SCHEMA.split(";"):
                 if stmt.strip():
                     cur.execute(stmt)
+            _ensure_columns(cur)
+
+
+def _ensure_columns(cur) -> None:
+    """为已存在的旧表补列。MySQL 没有 ADD COLUMN IF NOT EXISTS，先查再改。"""
+    required = {
+        "work_orders": [
+            ("issue_type", "VARCHAR(32) NOT NULL DEFAULT '其他'"),
+            ("priority", "VARCHAR(16) NOT NULL DEFAULT '普通'"),
+            ("source", "VARCHAR(16) NOT NULL DEFAULT 'ai'"),
+        ]
+    }
+    for table, columns in required.items():
+        cur.execute(
+            "SELECT COLUMN_NAME FROM information_schema.COLUMNS"
+            " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s",
+            (table,),
+        )
+        existing = {row["COLUMN_NAME"] for row in cur.fetchall()}
+        for name, definition in columns:
+            if name not in existing:
+                cur.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+
+    # 工单可能未关联具体商品（订单号在商品表里查不到），需要允许为空
+    cur.execute(
+        "SELECT IS_NULLABLE FROM information_schema.COLUMNS"
+        " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'work_orders'"
+        "   AND COLUMN_NAME = 'product_id'"
+    )
+    row = cur.fetchone()
+    if row and row["IS_NULLABLE"] == "NO":
+        cur.execute("ALTER TABLE work_orders MODIFY COLUMN product_id VARCHAR(32) NULL")
 
 
 # ---------- 会话 ----------
@@ -276,6 +312,84 @@ def _product_row(r: dict) -> dict:
         "stock": r["stock"],
         "description": r["description"],
     }
+
+
+WORK_ORDER_OPEN_STATUSES = ("待处理", "处理中")
+
+
+def visitor_has_order(visitor_id: str, order_no: str) -> bool:
+    """该顾客名下是否有此订单号（以既有工单记录为准）。用于建单前的归属校验。"""
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM work_orders WHERE visitor_id = %s AND order_no = %s LIMIT 1",
+            (visitor_id, order_no),
+        )
+        return cur.fetchone() is not None
+
+
+def find_open_work_order(
+    visitor_id: str, order_no: str, issue_type: str
+) -> dict | None:
+    """查找同一顾客、同一订单、同一类型且未完结的工单，用于防重复建单。"""
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, status, created_at
+              FROM work_orders
+             WHERE visitor_id = %s AND order_no = %s AND issue_type = %s
+               AND status IN %s
+             ORDER BY id ASC LIMIT 1
+            """,
+            (visitor_id, order_no, issue_type, WORK_ORDER_OPEN_STATUSES),
+        )
+        return cur.fetchone()
+
+
+def create_work_order(
+    visitor_id: str,
+    order_no: str,
+    issue_type: str,
+    description: str,
+) -> str:
+    """新建工单，返回对外工单号。归属与状态由服务端强制，不由模型传入。"""
+    work_order_no = "WO" + uuid.uuid4().hex[:10].upper()
+
+    with _connect() as conn, conn.cursor() as cur:
+        # 商品从该顾客同一订单的既有工单继承；没有则留空
+        cur.execute(
+            """
+            SELECT product_id FROM work_orders
+             WHERE visitor_id = %s AND order_no = %s AND product_id IS NOT NULL
+             ORDER BY created_at DESC LIMIT 1
+            """,
+            (visitor_id, order_no),
+        )
+        row = cur.fetchone()
+        product_id = row["product_id"] if row else None
+
+        now = _now()
+        cur.execute(
+            """
+            INSERT INTO work_orders
+                (id, visitor_id, order_no, product_id, status, issue, issue_type,
+                 priority, source, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                work_order_no,
+                visitor_id,
+                order_no,
+                product_id,
+                "待处理",
+                description,
+                issue_type,
+                "普通",
+                "ai",
+                now,
+                now,
+            ),
+        )
+    return work_order_no
 
 
 def find_work_order(visitor_id: str, order_no: str) -> dict | None:

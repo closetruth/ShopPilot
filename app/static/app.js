@@ -241,7 +241,10 @@ async function send(text) {
           saveSession();
         } else if (msg.tool) {
           if (msg.status === "start") {
-            toolHint.textContent = "正在查询" + (msg.label || "") + "…";
+            toolHint.textContent =
+              msg.tool === "create_work_order"
+                ? "正在提交工单…"
+                : "正在查询" + (msg.label || "") + "…";
             toolHint.hidden = false;
           } else {
             toolHint.hidden = true;

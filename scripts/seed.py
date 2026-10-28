@@ -29,11 +29,14 @@ PRODUCTS = [
 
 WORK_ORDERS = [
     ("wo-1", DEMO_VISITOR, "ORDER20260001", "p-mug-blue", "运输破损",
-     "顾客收到时杯口有裂纹", "2026-10-20 09:12:00", "2026-10-26 14:30:00"),
+     "顾客收到时杯口有裂纹", "运输破损", "普通", "manual",
+     "2026-10-20 09:12:00", "2026-10-26 14:30:00"),
     ("wo-2", DEMO_VISITOR, "ORDER20260002", "p-bottle-pink", "发货延迟",
-     "下单 5 天未发货", "2026-10-24 18:05:00", "2026-10-27 10:11:00"),
+     "下单 5 天未发货", "发货延迟", "普通", "manual",
+     "2026-10-24 18:05:00", "2026-10-27 10:11:00"),
     ("wo-3", "another-visitor", "ORDER20260003", "p-bowl-ceramic", "退换货",
-     "尺寸不合适申请退货", "2026-10-25 11:20:00", "2026-10-27 16:45:00"),
+     "尺寸不合适申请退货", "退换货", "普通", "manual",
+     "2026-10-25 11:20:00", "2026-10-27 16:45:00"),
 ]
 
 
@@ -57,10 +60,12 @@ def seed() -> None:
                 """
                 INSERT INTO work_orders
                     (id, visitor_id, order_no, product_id, status, issue,
-                     created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                     issue_type, priority, source, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     status = VALUES(status), issue = VALUES(issue),
+                    issue_type = VALUES(issue_type),
+                    priority = VALUES(priority), source = VALUES(source),
                     updated_at = VALUES(updated_at)
                 """,
                 WORK_ORDERS,

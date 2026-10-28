@@ -26,6 +26,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 TOOL_LABELS = {
     "lookup_product": "商品",
     "lookup_work_order": "工单",
+    "create_work_order": "工单提交",
 }
 
 
