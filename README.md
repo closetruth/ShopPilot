@@ -25,6 +25,13 @@ uv run uvicorn app.main:app --reload
 | `MYSQL_HOST` / `MYSQL_PORT` | 数据库地址 | `127.0.0.1` / `3307` |
 | `MYSQL_USER` / `MYSQL_PASSWORD` | 数据库账号 | `shoppilot` / `shoppilot` |
 | `MYSQL_DATABASE` | 库名 | `shoppilot` |
+| `SILICONFLOW_API_KEY` | 嵌入服务密钥 | `sk-...` |
+| `EMBED_MODEL` | 嵌入模型 | `BAAI/bge-m3` |
+| `EMBED_BASE_URL` | 嵌入服务地址 | `https://api.siliconflow.cn/v1` |
+| `VECTOR_DB_PATH` | Milvus Lite 数据文件 | `data/milvus.db` |
+
+> 不要用 `MILVUS_URI` 作变量名——pymilvus 会把它当服务端地址解析，
+> 相对文件路径会被判为非法 URI。
 
 换模型供应商只改前三个变量，代码无需改动。
 
@@ -85,8 +92,24 @@ SSE 事件：
 | `list_my_orders` | 列出当前顾客的订单 | 无参数，只返回本人订单 |
 | `lookup_work_order` | 按订单号查工单进度 | 只能查本人；查不到时不区分「不存在」与「不属于你」 |
 | `draft_work_order` | 起草待确认的工单 | **不写库**，仅生成草稿供前端确认 |
+| `search_knowledge` | 按语义检索商品与本人历史工单 | 只能命中公开数据与本人私有数据 |
 
 参数经 Pydantic 校验，非法时返回结构化错误让模型自行纠正，不中断对话。
+
+## 向量检索
+
+商品与工单在写入 MySQL 后同步嵌入（BGE-M3，1024 维）并写入 Milvus Lite。
+MySQL 是唯一事实来源，向量索引可随时重建。
+
+```bash
+# 服务停止时
+uv run python -m scripts.reindex --drop
+
+# 服务运行中（Milvus Lite 独占文件，须在服务进程内重建）
+curl -X POST "http://127.0.0.1:8000/api/admin/reindex?drop=true"
+```
+
+`POST /api/admin/reindex` 当前无鉴权，生产部署前必须加保护。
 
 ## 工单写入路径
 
