@@ -20,10 +20,7 @@ def main(drop: bool = False) -> None:
 
     result = vector_store.rebuild_from_store(drop=drop)
 
-    print(
-        f"读取 {result['products']} 个商品 + {result['work_orders']} 张工单，"
-        f"共 {result['total']} 条文档"
-    )
+    print(f"读取 {result['faq']} 条政策知识，共 {result['total']} 条文档")
     print(f"成功写入 {result['written']} 条向量")
 
     if result["written"] < result["total"]:
