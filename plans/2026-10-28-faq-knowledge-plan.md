@@ -1,5 +1,9 @@
 # ShopPilot 阶段七实施计划：政策知识库
 
+日期：2026-10-28
+类型：实施计划
+状态：已完成
+
 对应设计：`docs/superpowers/specs/2026-10-28-faq-knowledge-design.md`
 
 ## 步骤 1：数据获取

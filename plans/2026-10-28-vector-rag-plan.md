@@ -1,5 +1,9 @@
 # ShopPilot 阶段六实施计划：向量检索与 RAG
 
+日期：2026-10-28
+类型：实施计划
+状态：已完成
+
 对应设计：`docs/superpowers/specs/2026-10-28-vector-rag-design.md`
 
 ## 步骤 1：环境探查与选型验证

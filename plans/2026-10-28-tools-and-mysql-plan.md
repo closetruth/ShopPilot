@@ -1,5 +1,9 @@
 # ShopPilot 阶段二实施计划：工具调用 + MySQL
 
+日期：2026-10-28
+类型：实施计划
+状态：已完成
+
 对应设计：`docs/superpowers/specs/2026-10-28-tools-and-mysql-design.md`
 
 ## 步骤 1：依赖与环境

@@ -1,5 +1,9 @@
 # ShopPilot 阶段三实施计划：创建工单
 
+日期：2026-10-28
+类型：实施计划
+状态：已完成
+
 对应设计：`docs/superpowers/specs/2026-10-28-create-work-order-design.md`
 
 ## 步骤 1：数据模型
