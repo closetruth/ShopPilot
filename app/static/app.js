@@ -383,18 +383,40 @@ function renderOrderItem(order) {
   item.append(top, meta, time);
 
   if (order.work_orders.length) {
-    const tags = document.createElement("div");
-    tags.className = "wo-tags";
+    const summary = document.createElement("div");
+    summary.className = "order-wo-summary";
+
+    const label = document.createElement("span");
+    label.className = "order-wo-label";
+    const open = order.work_orders.filter(
+      (w) => w.status !== "已完结"
+    ).length;
+    label.textContent =
+      "已有 " + order.work_orders.length + " 张工单" +
+      (open ? "，其中 " + open + " 张未完结" : "，已全部完结");
+    summary.appendChild(label);
+
+    const list = document.createElement("div");
+    list.className = "order-wo-list";
     for (const wo of order.work_orders) {
-      const tag = document.createElement("span");
-      tag.className = "wo-tag";
-      tag.append(statusBadge(wo.status));
-      const t = document.createElement("span");
-      t.textContent = wo.issue_type;
-      tag.appendChild(t);
-      tags.appendChild(tag);
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "order-wo-row";
+      row.addEventListener("click", () => openOrdersPanel("workorders"));
+
+      const no = document.createElement("span");
+      no.className = "wo-no-sm";
+      no.textContent = wo.work_order_no;
+
+      const type = document.createElement("span");
+      type.className = "order-wo-type";
+      type.textContent = wo.issue_type;
+
+      row.append(no, type, statusBadge(wo.status));
+      list.appendChild(row);
     }
-    item.appendChild(tags);
+    summary.appendChild(list);
+    item.appendChild(summary);
   }
 
   const actions = document.createElement("div");

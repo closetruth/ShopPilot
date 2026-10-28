@@ -36,13 +36,13 @@ ORDERS = [
 ]
 
 WORK_ORDERS = [
-    ("wo-1", DEMO_VISITOR, "ORDER20260001", "p-mug-blue", "待处理",
+    ("WO1000000001", DEMO_VISITOR, "ORDER20260001", "p-mug-blue", "待处理",
      "顾客收到时杯口有裂纹", "运输破损", "普通", "manual",
      "2026-10-20 09:12:00", "2026-10-26 14:30:00"),
-    ("wo-2", DEMO_VISITOR, "ORDER20260002", "p-bottle-pink", "处理中",
+    ("WO1000000002", DEMO_VISITOR, "ORDER20260002", "p-bottle-pink", "处理中",
      "下单 5 天未发货", "发货延迟", "普通", "manual",
      "2026-10-24 18:05:00", "2026-10-27 10:11:00"),
-    ("wo-3", "another-visitor", "ORDER20260003", "p-bowl-ceramic", "已完结",
+    ("WO1000000003", "another-visitor", "ORDER20260003", "p-bowl-ceramic", "已完结",
      "尺寸不合适申请退货", "退换货", "普通", "manual",
      "2026-10-25 11:20:00", "2026-10-27 16:45:00"),
 ]
@@ -52,6 +52,10 @@ def seed() -> None:
     conn = pymysql.connect(**_conn_params())
     try:
         with conn.cursor() as cur:
+            # 清掉旧格式的演示工单，避免与新编号并存
+            cur.execute(
+                "DELETE FROM work_orders WHERE id IN ('wo-1', 'wo-2', 'wo-3')"
+            )
             cur.executemany(
                 """
                 INSERT INTO products

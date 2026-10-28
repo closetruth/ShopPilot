@@ -434,6 +434,54 @@ html, body {
   background: var(--panel);
 }
 
+.order-wo-summary {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f7f9fc;
+}
+
+.order-wo-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.order-wo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-wo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.order-wo-row:hover { background: var(--hover); }
+
+.wo-no-sm {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.order-wo-type {
+  flex: 1;
+}
+
 .wo-tags {
   display: flex;
   flex-wrap: wrap;
