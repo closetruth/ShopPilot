@@ -1,0 +1,20 @@
+[project]
+name = "shoppilot"
+version = "0.1.0"
+description = "电商智能客服系统 — 阶段一：纯对话 MVP"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "langchain-openai>=0.3",
+    "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.28",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
