@@ -11,16 +11,22 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field
 
 from app import store
+from app.agent import build_agent
 from app.llm import ConfigError, get_llm
-from app.prompt import SYSTEM_PROMPT
+from app.tools import AgentContext
 
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+TOOL_LABELS = {
+    "lookup_product": "商品",
+    "lookup_work_order": "工单",
+}
 
 
 @asynccontextmanager
@@ -98,20 +104,35 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         collected: list[str] = []
         saved = False
         try:
-            llm = get_llm()
-            messages = [SystemMessage(content=SYSTEM_PROMPT)]
+            agent = build_agent()
+            messages = []
             for m in history:
                 cls = HumanMessage if m["role"] == "user" else AIMessage
                 messages.append(cls(content=m["content"]))
             messages.append(HumanMessage(content=req.message))
 
-            async for chunk in llm.astream(messages):
-                text = _text_of(chunk.content)
-                if text:
-                    collected.append(text)
-                    yield _sse({"delta": text})
+            async for event in agent.astream_events(
+                {"messages": messages},
+                context=AgentContext(visitor_id=req.visitor_id),
+                config={"configurable": {"thread_id": conversation_id}},
+                version="v2",
+            ):
+                kind = event.get("event")
+                if kind == "on_chat_model_stream":
+                    text = _text_of(event["data"]["chunk"].content)
+                    if text:
+                        collected.append(text)
+                        yield _sse({"delta": text})
+                elif kind == "on_tool_start":
+                    name = event.get("name", "")
+                    label = TOOL_LABELS.get(name, name)
+                    yield _sse({"tool": name, "label": label, "status": "start"})
+                elif kind == "on_tool_end":
+                    name = event.get("name", "")
+                    label = TOOL_LABELS.get(name, name)
+                    yield _sse({"tool": name, "label": label, "status": "done"})
 
-            assistant_text = "".join(collected)
+            assistant_text = "".join(collected).strip()
             if assistant_text:
                 store.append_message(conversation_id, "assistant", assistant_text)
                 saved = True
@@ -122,7 +143,9 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         finally:
             # 客户端中断时把已生成的部分落库，保持会话完整可回看
             if not saved and collected:
-                store.append_message(conversation_id, "assistant", "".join(collected))
+                store.append_message(
+                    conversation_id, "assistant", "".join(collected).strip()
+                )
 
     return StreamingResponse(
         stream(),

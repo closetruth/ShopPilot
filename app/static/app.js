@@ -186,6 +186,11 @@ async function send(text) {
   const { row, bubble } = addRow("bot");
   bubble.classList.add("streaming");
 
+  const toolHint = document.createElement("div");
+  toolHint.className = "tool-hint";
+  toolHint.hidden = true;
+  row.insertBefore(toolHint, bubble);
+
   let acc = "";
   let failed = false;
   let createdNew = false;
@@ -234,6 +239,13 @@ async function send(text) {
           if (!conversationId) createdNew = true;
           conversationId = msg.conversation_id;
           saveSession();
+        } else if (msg.tool) {
+          if (msg.status === "start") {
+            toolHint.textContent = "正在查询" + (msg.label || "") + "…";
+            toolHint.hidden = false;
+          } else {
+            toolHint.hidden = true;
+          }
         } else if (msg.delta) {
           acc += msg.delta;
           setText(bubble, acc);
@@ -250,6 +262,7 @@ async function send(text) {
     setText(bubble, "网络异常，请稍后重试");
   } finally {
     bubble.classList.remove("streaming");
+    toolHint.hidden = true;
     if (!acc && !failed) setText(bubble, "（无回复）");
     busy = false;
     sendEl.disabled = false;

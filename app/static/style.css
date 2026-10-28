@@ -171,6 +171,23 @@ html, body {
   border-bottom-left-radius: 4px;
 }
 
+.tool-hint {
+  align-self: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #f0f2f5;
+  color: var(--muted);
+  font-size: 12px;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.tool-hint[hidden] { display: none; }
+
+@keyframes pulse {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+
 .row.error .bubble {
   background: #fdeaea;
   color: var(--error);
