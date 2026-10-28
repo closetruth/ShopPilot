@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Iterator
 
 import pymysql
@@ -43,6 +43,30 @@ CREATE TABLE IF NOT EXISTS products (
     description TEXT          NOT NULL,
     KEY idx_products_name (name),
     KEY idx_products_category (category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS orders (
+    order_no    VARCHAR(32)   NOT NULL PRIMARY KEY,
+    visitor_id  VARCHAR(64)   NOT NULL,
+    product_id  VARCHAR(32)   NULL,
+    quantity    INT           NOT NULL DEFAULT 1,
+    amount_cents INT          NOT NULL DEFAULT 0,
+    created_at  DATETIME(6)   NOT NULL,
+    KEY idx_orders_visitor (visitor_id),
+    KEY idx_orders_product (product_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS work_order_drafts (
+    id          VARCHAR(48)   NOT NULL PRIMARY KEY,
+    visitor_id  VARCHAR(64)   NOT NULL,
+    conversation_id VARCHAR(32) NOT NULL,
+    order_no    VARCHAR(32)   NOT NULL,
+    issue_type  VARCHAR(32)   NOT NULL,
+    description TEXT          NOT NULL,
+    created_at  DATETIME(6)   NOT NULL,
+    expires_at  DATETIME(6)   NOT NULL,
+    KEY idx_drafts_visitor (visitor_id),
+    KEY idx_drafts_expiry (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS work_orders (
@@ -318,13 +342,74 @@ WORK_ORDER_OPEN_STATUSES = ("待处理", "处理中")
 
 
 def visitor_has_order(visitor_id: str, order_no: str) -> bool:
-    """该顾客名下是否有此订单号（以既有工单记录为准）。用于建单前的归属校验。"""
+    """该顾客名下是否有此订单。建单前据此校验归属。"""
     with _connect() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT 1 FROM work_orders WHERE visitor_id = %s AND order_no = %s LIMIT 1",
+            "SELECT 1 FROM orders WHERE visitor_id = %s AND order_no = %s LIMIT 1",
             (visitor_id, order_no),
         )
         return cur.fetchone() is not None
+
+
+def list_orders(visitor_id: str) -> list[dict]:
+    """该顾客的订单，最新的在前，附带已关联的工单。"""
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT o.order_no, o.quantity, o.amount_cents, o.created_at,
+                   p.name AS product_name, p.color AS product_color
+              FROM orders o
+              LEFT JOIN products p ON p.id = o.product_id
+             WHERE o.visitor_id = %s
+             ORDER BY o.created_at DESC
+            """,
+            (visitor_id,),
+        )
+        rows = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT order_no, id, status, issue_type
+              FROM work_orders
+             WHERE visitor_id = %s
+             ORDER BY created_at ASC
+            """,
+            (visitor_id,),
+        )
+        order_rows = cur.fetchall()
+
+    by_order: dict[str, list[dict]] = {}
+    for wo in order_rows:
+        by_order.setdefault(wo["order_no"], []).append(
+            {
+                "work_order_no": wo["id"],
+                "status": wo["status"],
+                "issue_type": wo["issue_type"],
+            }
+        )
+
+    return [
+        {
+            "order_no": r["order_no"],
+            "product": (
+                f"{r['product_name']}（{r['product_color']}）"
+                if r["product_name"]
+                else None
+            ),
+            "quantity": r["quantity"],
+            "amount_yuan": r["amount_cents"] / 100,
+            "created_at": r["created_at"].isoformat(),
+            "work_orders": by_order.get(r["order_no"], []),
+        }
+        for r in rows
+    ]
+
+
+def get_order(visitor_id: str, order_no: str) -> dict | None:
+    for order in list_orders(visitor_id):
+        if order["order_no"] == order_no:
+            return order
+    return None
 
 
 def find_open_work_order(
@@ -343,6 +428,147 @@ def find_open_work_order(
             (visitor_id, order_no, issue_type, WORK_ORDER_OPEN_STATUSES),
         )
         return cur.fetchone()
+
+
+DRAFT_TTL_MINUTES = 30
+
+
+def create_work_order_draft(
+    visitor_id: str,
+    conversation_id: str,
+    order_no: str,
+    issue_type: str,
+    description: str,
+) -> dict:
+    """暂存待确认的建单草稿。草稿不产生工单，只是给前端渲染确认卡。"""
+    draft_id = "drf-" + uuid.uuid4().hex
+    now = _now()
+    expires = now + timedelta(minutes=DRAFT_TTL_MINUTES)
+
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO work_order_drafts
+                (id, visitor_id, conversation_id, order_no, issue_type,
+                 description, created_at, expires_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                draft_id,
+                visitor_id,
+                conversation_id,
+                order_no,
+                issue_type,
+                description,
+                now,
+                expires,
+            ),
+        )
+    return {
+        "draft_id": draft_id,
+        "order_no": order_no,
+        "issue_type": issue_type,
+        "description": description,
+        "expires_at": expires.isoformat(),
+        "product": _product_for_order(visitor_id, order_no),
+    }
+
+
+def get_work_order_draft(draft_id: str, visitor_id: str) -> dict | None:
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, conversation_id, order_no, issue_type, description, expires_at
+              FROM work_order_drafts
+             WHERE id = %s AND visitor_id = %s
+            """,
+            (draft_id, visitor_id),
+        )
+        row = cur.fetchone()
+    if row is None:
+        return None
+    return {
+        "draft_id": row["id"],
+        "conversation_id": row["conversation_id"],
+        "order_no": row["order_no"],
+        "issue_type": row["issue_type"],
+        "description": row["description"],
+        "expires_at": row["expires_at"].isoformat(),
+        "product": _product_for_order(visitor_id, row["order_no"]),
+    }
+
+
+def delete_work_order_draft(draft_id: str) -> None:
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM work_order_drafts WHERE id = %s", (draft_id,))
+
+
+def purge_expired_drafts() -> int:
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM work_order_drafts WHERE expires_at < %s", (_now(),))
+        return cur.rowcount
+
+
+def _product_for_order(visitor_id: str, order_no: str) -> str | None:
+    """该顾客此订单关联的商品名，用于确认卡上核对。"""
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT p.name, p.color
+              FROM work_orders o
+              JOIN products p ON p.id = o.product_id
+             WHERE o.visitor_id = %s AND o.order_no = %s
+             ORDER BY o.created_at DESC LIMIT 1
+            """,
+            (visitor_id, order_no),
+        )
+        row = cur.fetchone()
+    if row is None:
+        return None
+    return f"{row['name']}（{row['color']}）"
+
+
+def list_work_orders(visitor_id: str) -> list[dict]:
+    """该顾客全部工单，最近更新在前，附带商品名用于核对。"""
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT o.id, o.order_no, o.issue_type, o.status, o.issue,
+                   o.created_at, o.updated_at,
+                   p.name AS product_name, p.color AS product_color
+              FROM work_orders o
+              LEFT JOIN products p ON p.id = o.product_id
+             WHERE o.visitor_id = %s
+             ORDER BY o.updated_at DESC
+            """,
+            (visitor_id,),
+        )
+        rows = cur.fetchall()
+
+    return [
+        {
+            "work_order_no": r["id"],
+            "order_no": r["order_no"],
+            "issue_type": r["issue_type"],
+            "status": r["status"],
+            "description": r["issue"],
+            "product": (
+                f"{r['product_name']}（{r['product_color']}）"
+                if r["product_name"]
+                else None
+            ),
+            "created_at": r["created_at"].isoformat(),
+            "updated_at": r["updated_at"].isoformat(),
+        }
+        for r in rows
+    ]
+
+
+def get_work_order(visitor_id: str, work_order_no: str) -> dict | None:
+    for order in list_work_orders(visitor_id):
+        if order["work_order_no"] == work_order_no:
+            return order
+    return None
 
 
 def create_work_order(

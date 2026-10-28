@@ -27,14 +27,22 @@ PRODUCTS = [
      "5.5 英寸，釉面光滑，可洗碗机清洗。"),
 ]
 
+ORDERS = [
+    ("ORDER20260001", DEMO_VISITOR, "p-mug-blue", 1, 5900, "2026-10-19 20:41:00"),
+    ("ORDER20260002", DEMO_VISITOR, "p-bottle-pink", 1, 12900, "2026-10-23 11:02:00"),
+    # 该顾客尚未提过工单：验证「首单顾客也能建单」
+    ("ORDER20260009", DEMO_VISITOR, "p-mug-white", 2, 7800, "2026-10-27 09:15:00"),
+    ("ORDER20260003", "another-visitor", "p-bowl-ceramic", 1, 2900, "2026-10-24 15:30:00"),
+]
+
 WORK_ORDERS = [
-    ("wo-1", DEMO_VISITOR, "ORDER20260001", "p-mug-blue", "运输破损",
+    ("wo-1", DEMO_VISITOR, "ORDER20260001", "p-mug-blue", "待处理",
      "顾客收到时杯口有裂纹", "运输破损", "普通", "manual",
      "2026-10-20 09:12:00", "2026-10-26 14:30:00"),
-    ("wo-2", DEMO_VISITOR, "ORDER20260002", "p-bottle-pink", "发货延迟",
+    ("wo-2", DEMO_VISITOR, "ORDER20260002", "p-bottle-pink", "处理中",
      "下单 5 天未发货", "发货延迟", "普通", "manual",
      "2026-10-24 18:05:00", "2026-10-27 10:11:00"),
-    ("wo-3", "another-visitor", "ORDER20260003", "p-bowl-ceramic", "退换货",
+    ("wo-3", "another-visitor", "ORDER20260003", "p-bowl-ceramic", "已完结",
      "尺寸不合适申请退货", "退换货", "普通", "manual",
      "2026-10-25 11:20:00", "2026-10-27 16:45:00"),
 ]
@@ -58,6 +66,20 @@ def seed() -> None:
             )
             cur.executemany(
                 """
+                INSERT INTO orders
+                    (order_no, visitor_id, product_id, quantity, amount_cents,
+                     created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    visitor_id = VALUES(visitor_id),
+                    product_id = VALUES(product_id),
+                    quantity = VALUES(quantity),
+                    amount_cents = VALUES(amount_cents)
+                """,
+                ORDERS,
+            )
+            cur.executemany(
+                """
                 INSERT INTO work_orders
                     (id, visitor_id, order_no, product_id, status, issue,
                      issue_type, priority, source, created_at, updated_at)
@@ -71,7 +93,10 @@ def seed() -> None:
                 WORK_ORDERS,
             )
         conn.commit()
-        print(f"seeded {len(PRODUCTS)} products, {len(WORK_ORDERS)} work orders")
+        print(
+            f"seeded {len(PRODUCTS)} products, {len(ORDERS)} orders, "
+            f"{len(WORK_ORDERS)} work orders"
+        )
     finally:
         conn.close()
 

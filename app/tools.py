@@ -83,17 +83,35 @@ def lookup_work_order(
 
 
 @tool
-def create_work_order(
+def list_my_orders(runtime: ToolRuntime[AgentContext]) -> dict:
+    """列出当前顾客名下的全部订单（订单号、商品、下单时间、已有工单）。
+    顾客不确定订单号、或在问「我的订单」「我买的东西」时使用，避免让顾客
+    凭记忆报订单号。无参数。"""
+    try:
+        orders = store.list_orders(runtime.context.visitor_id)
+    except Exception:  # noqa: BLE001
+        return {"error": "订单查询暂时不可用，请稍后重试"}
+
+    if not orders:
+        return {"orders": [], "note": "该顾客名下没有订单记录"}
+    return {"orders": orders, "count": len(orders)}
+
+
+@tool
+def draft_work_order(
     runtime: ToolRuntime[AgentContext],
     order_no: Annotated[str, "订单号，8-32 位大写字母或数字"],
     issue_type: Annotated[str, "问题类型，必须是：运输破损 / 发货延迟 / 质量问题 / 退换货 / 其他"],
     description: Annotated[str, "顾客描述的具体问题，需包含可核实细节，10-500 字"],
 ) -> dict:
-    """为顾客提交售后工单。仅在顾客已明确同意提交后才可调用：
-    你必须先在对话中复述订单号、问题类型与问题描述，得到顾客「确认」「可以」
-    等明确答复后才能调用本工具。顾客未表态、犹豫或说「先不用」时禁止调用。
+    """为顾客准备一张待确认的售后工单草稿。本工具不会真正提交工单：
+    它只把内容存成草稿，界面上会出现确认卡片，由顾客点击按钮后才会提交。
 
-    同一顾客同一订单同一类型已有未完结工单时不会重复创建，会返回既有工单。"""
+    因此你不需要征求顾客口头同意，随时可以起草；但必须先把订单号、
+    问题类型与问题描述问清楚，缺信息时先追问。顾客点击界面上的确认按钮
+    后工单才会生成，你无法直接建立工单，也不要宣称「已提交」。
+
+    同一顾客同一订单同一类型已有未完结工单时不会起草，会返回既有工单。"""
     try:
         query = WorkOrderCreate(
             order_no=order_no, issue_type=issue_type, description=description
@@ -105,12 +123,11 @@ def create_work_order(
 
     try:
         if not store.visitor_has_order(visitor_id, query.order_no):
-            # 与查单一致，不区分「订单不存在」与「不属于当前顾客」
             return {
                 "created": False,
                 "reason": "order_not_found",
-                "note": "系统中查不到该订单号属于当前顾客，无法建单。"
-                "请顾客核对订单号，或说明需要人工核实。不要改为直接建单。",
+                "note": "系统中查不到该订单号属于当前顾客，无法起草工单。"
+                "请顾客核对订单号，或说明需要人工核实。不要改为直接起草。",
             }
 
         existing = store.find_open_work_order(
@@ -122,25 +139,18 @@ def create_work_order(
                 "reason": "duplicate",
                 "existing_work_order_no": existing["id"],
                 "existing_status": existing["status"],
-                "note": "该订单已有同类未完结工单，请告知顾客正在处理中，不要重复提交。",
+                "note": "该订单已有同类未完结工单，请告知顾客正在处理中，不要重复起草。",
             }
-
-        work_order_no = store.create_work_order(
-            visitor_id=visitor_id,
-            order_no=query.order_no,
-            issue_type=query.issue_type,
-            description=query.description,
-        )
     except Exception:  # noqa: BLE001 - 数据库异常作为数据回给模型
-        return {"error": "工单提交失败，请稍后重试或转人工处理"}
+        return {"error": "工单草稿创建失败，请稍后重试或转人工处理"}
 
     return {
-        "created": True,
-        "work_order_no": work_order_no,
-        "status": "待处理",
+        "drafted": True,
+        "order_no": query.order_no,
         "issue_type": query.issue_type,
-        "note": "已提交。请告知顾客工单号与当前状态，不要承诺具体处理时限。",
+        "note": "草稿已生成，确认卡片会显示在界面上。请告知顾客核对卡片内容并点击确认提交，"
+        "不要说「已提交」或给出工单号——工单此时尚未创建。",
     }
 
 
-TOOLS = [lookup_product, lookup_work_order, create_work_order]
+TOOLS = [lookup_product, list_my_orders, lookup_work_order, draft_work_order]

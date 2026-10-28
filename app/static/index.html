@@ -25,6 +25,7 @@
           <h1>店铺客服</h1>
           <span class="status" id="status">在线</span>
         </div>
+        <button class="orders-btn" id="ordersBtn" type="button">我的工单</button>
       </header>
 
       <main class="messages" id="messages" aria-live="polite"></main>
@@ -34,6 +35,22 @@
         <button type="submit" id="send" aria-label="发送">发送</button>
       </form>
     </section>
+
+    <aside class="orders-panel" id="ordersPanel" aria-label="我的订单与工单" hidden>
+      <div class="orders-head">
+        <div class="panel-tabs">
+          <button class="panel-tab active" id="tabOrders" type="button">我的订单</button>
+          <button class="panel-tab" id="tabWorkOrders" type="button">我的工单</button>
+        </div>
+        <button class="orders-close" id="ordersClose" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="orders-body">
+        <p class="orders-empty" id="ordersEmpty" hidden>还没有订单</p>
+        <div class="orders-list" id="ordersList"></div>
+        <p class="orders-empty" id="woEmpty" hidden>还没有工单</p>
+        <div class="orders-list" id="woList" hidden></div>
+      </div>
+    </aside>
   </div>
   <script src="/app.js"></script>
 </body>

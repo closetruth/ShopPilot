@@ -134,7 +134,8 @@ def test_find_work_order_owned(visitor):
 
     order = store.find_work_order(DEMO_VISITOR, "ORDER20260001")
     assert order is not None
-    assert order["status"] == "运输破损"
+    assert order["status"] == "待处理"
+    assert "裂纹" in order["issue"]
 
 
 def test_find_work_order_not_owned_returns_none(visitor):
@@ -201,9 +202,100 @@ def test_find_open_work_order_different_type_is_not_duplicate(visitor):
 
 
 def test_visitor_has_order(visitor):
-    store.create_work_order(
-        visitor, "ORDER20990005", "其他", "顾客咨询售后流程需要记录跟进"
+    from scripts.seed import DEMO_VISITOR
+
+    # 归属校验现在查 orders 表，不再从工单反推
+    assert store.visitor_has_order(DEMO_VISITOR, "ORDER20260001")
+    assert not store.visitor_has_order(DEMO_VISITOR, "ORDER20990006")
+    assert not store.visitor_has_order("someone-else", "ORDER20260001")
+
+
+def test_list_orders_includes_work_orders(visitor):
+    from scripts.seed import DEMO_VISITOR
+
+    orders = store.list_orders(DEMO_VISITOR)
+    numbers = [o["order_no"] for o in orders]
+    assert "ORDER20260001" in numbers
+    assert "ORDER20260009" in numbers  # 未提过工单的订单也要列出
+
+    target = next(o for o in orders if o["order_no"] == "ORDER20260001")
+    assert target["product"] == "青花瓷马克杯（蓝色）"
+    assert target["work_orders"]
+    assert target["work_orders"][0]["status"] == "待处理"
+
+    fresh = next(o for o in orders if o["order_no"] == "ORDER20260009")
+    assert fresh["work_orders"] == []
+
+
+def test_list_orders_scoped_to_visitor(visitor):
+    from scripts.seed import DEMO_VISITOR
+
+    assert all(
+        o["order_no"] != "ORDER20260003" for o in store.list_orders(DEMO_VISITOR)
     )
-    assert store.visitor_has_order(visitor, "ORDER20990005")
-    assert not store.visitor_has_order(visitor, "ORDER20990006")
-    assert not store.visitor_has_order("someone-else", "ORDER20990005")
+    other = store.list_orders("another-visitor")
+    assert [o["order_no"] for o in other] == ["ORDER20260003"]
+
+
+def test_get_order_scoped(visitor):
+    from scripts.seed import DEMO_VISITOR
+
+    assert store.get_order(DEMO_VISITOR, "ORDER20260009") is not None
+    assert store.get_order("another-visitor", "ORDER20260009") is None
+
+
+def test_draft_does_not_create_work_order(visitor):
+    store.create_work_order(visitor, "ORDER20990100", "退换货", "尺寸不合适申请退货处理")
+    before = len(store.list_work_orders(visitor))
+
+    draft = store.create_work_order_draft(
+        visitor, "conv-x", "ORDER20990100", "运输破损", "收到时杯口有裂纹，外包装完好"
+    )
+    assert draft["draft_id"].startswith("drf-")
+    assert len(store.list_work_orders(visitor)) == before
+
+
+def test_draft_roundtrip_and_scoped_to_visitor(visitor):
+    draft = store.create_work_order_draft(
+        visitor, "conv-x", "ORDER20990101", "质量问题", "内胆涂层脱落使用一周后出现"
+    )
+    fetched = store.get_work_order_draft(draft["draft_id"], visitor)
+    assert fetched is not None
+    assert fetched["issue_type"] == "质量问题"
+
+    assert store.get_work_order_draft(draft["draft_id"], "someone-else") is None
+
+
+def test_draft_product_lookup(visitor):
+    from scripts.seed import DEMO_VISITOR
+
+    draft = store.create_work_order_draft(
+        DEMO_VISITOR, "conv-x", "ORDER20260001", "运输破损", "收到时杯口有裂纹外包装完好"
+    )
+    assert draft["product"] == "青花瓷马克杯（蓝色）"
+
+
+def test_draft_delete(visitor):
+    draft = store.create_work_order_draft(
+        visitor, "conv-x", "ORDER20990102", "其他", "顾客咨询售后流程需要记录跟进"
+    )
+    store.delete_work_order_draft(draft["draft_id"])
+    assert store.get_work_order_draft(draft["draft_id"], visitor) is None
+
+
+def test_list_work_orders_includes_created(visitor):
+    work_order_no = store.create_work_order(
+        visitor, "ORDER20990103", "发货延迟", "下单五天仍未发货物流无更新"
+    )
+    orders = store.list_work_orders(visitor)
+    assert [o["work_order_no"] for o in orders] == [work_order_no]
+    assert orders[0]["status"] == "待处理"
+    assert orders[0]["issue_type"] == "发货延迟"
+
+
+def test_get_work_order_scoped(visitor):
+    work_order_no = store.create_work_order(
+        visitor, "ORDER20990104", "运输破损", "收到时杯身有裂纹外包装压扁"
+    )
+    assert store.get_work_order(visitor, work_order_no) is not None
+    assert store.get_work_order("someone-else", work_order_no) is None
