@@ -72,6 +72,28 @@ docs/          设计文档与提示词
 plans/         实施计划
 ```
 
+## 知识库管理
+
+浏览器打开 `/admin`，可查看、新建、编辑、停用、删除政策知识。
+保存后立即同步向量索引，无需手动重建。
+
+```
+GET    /api/admin/faq                     列表（含停用项）
+GET    /api/admin/faq/categories          分类与条目数
+POST   /api/admin/faq                     新建
+PUT    /api/admin/faq/{id}                编辑
+DELETE /api/admin/faq/{id}                删除
+POST   /api/admin/faq/{id}/toggle         启用/停用
+GET    /api/admin/faq/search?q=           调试：查看原始相似度分数
+POST   /api/admin/reindex                 全量重建索引
+```
+
+> **管理接口目前没有鉴权**，任何能访问服务的人都能修改知识库。
+> 上线前必须加保护。
+
+正文要求 20–2000 字，标题与小节名各 2–64 字。小节名参与嵌入，建议写具体
+（「运费承担」优于「其他说明」）。
+
 ## 接口
 
 - `POST /api/chat` — 请求 `{"message": "...", "visitor_id": "...", "conversation_id": "可选"}`，返回 SSE 流
