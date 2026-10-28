@@ -1,10 +1,6 @@
 # ShopPilot 阶段八实施计划：代码结构整理
 
-日期：2026-10-28
-类型：实施计划
-状态：已完成
-
-对应设计：`docs/superpowers/specs/2026-10-28-code-structure-design.md`
+对应设计：`docs/superpowers/specs/2026-10-28_r09-code-structure-design.md`
 
 ## 步骤 1：脚本冒烟测试（高优先级）
 

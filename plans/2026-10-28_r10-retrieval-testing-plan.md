@@ -1,10 +1,6 @@
 # 检索链路测试与阈值标定：实施计划
 
-日期：2026-10-28
-类型：实施计划
-状态：已完成
-
-对应设计：`docs/superpowers/specs/2026-10-28-retrieval-testing-design.md`
+对应设计：`docs/superpowers/specs/2026-10-28_r10-retrieval-testing-design.md`
 
 ## 步骤 1：确认测试缺口
 
@@ -43,7 +39,7 @@
 
 ## 步骤 5：文档同步
 
-- [x] 更新 `2026-10-28-vector-rag-design.md` 的阈值章节，写入标定依据
+- [x] 更新 `2026-10-28_r06-vector-rag-design.md` 的阈值章节，写入标定依据
 - [x] 新增本文档与实施计划
 - [x] 提交
 

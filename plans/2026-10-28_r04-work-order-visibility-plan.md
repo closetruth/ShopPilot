@@ -1,10 +1,6 @@
 # ShopPilot 阶段四实施计划：工单可见化与前端确认
 
-日期：2026-10-28
-类型：实施计划
-状态：已完成
-
-对应设计：`docs/superpowers/specs/2026-10-28-work-order-visibility-design.md`
+对应设计：`docs/superpowers/specs/2026-10-28_r04-work-order-visibility-design.md`
 
 ## 步骤 1：订单表
 

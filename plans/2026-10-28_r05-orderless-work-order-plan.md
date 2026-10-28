@@ -1,10 +1,6 @@
 # ShopPilot 阶段五实施计划：无订单工单
 
-日期：2026-10-28
-类型：实施计划
-状态：已完成
-
-对应设计：`docs/superpowers/specs/2026-10-28-orderless-work-order-design.md`
+对应设计：`docs/superpowers/specs/2026-10-28_r05-orderless-work-order-design.md`
 
 ## 步骤 1：规则与校验
 
