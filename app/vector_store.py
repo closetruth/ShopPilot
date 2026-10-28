@@ -74,44 +74,14 @@ def _ensure_collection(client: MilvusClient) -> None:
 # ---------- 文档构建 ----------
 
 
-def product_document(product: dict) -> dict:
-    """商品向量：公开数据，visitor_id 为空串表示所有人可见。"""
-    text = " ".join(
-        part
-        for part in (
-            product.get("name"),
-            product.get("category"),
-            product.get("color"),
-            product.get("description"),
-        )
-        if part
-    )
-    return {
-        "id": f"product:{product['id']}",
-        "source": "product",
-        "source_id": product["id"],
-        "visitor_id": "",
-        "text": text[:TEXT_MAX],
-    }
-
-
-def work_order_document(order: dict) -> dict:
-    """工单向量：私有数据，visitor_id 参与过滤，防止跨顾客泄露。"""
-    text = f"{order.get('issue_type', '')} {order.get('description', '')}".strip()
-    return {
-        "id": f"work_order:{order['work_order_no']}",
-        "source": "work_order",
-        "source_id": order["work_order_no"],
-        "visitor_id": order.get("visitor_id", ""),
-        "text": text[:TEXT_MAX],
-    }
-
-
 def faq_document(section: dict) -> dict:
     """政策知识向量：公开数据，全店顾客可见。
 
     标题与小节名一并嵌入——只嵌正文会丢掉主题线索，
     比如「运费承担」小节单看正文不易判断属于退货还是换货。
+
+    商品与工单不做向量化：它们按结构化条件查询即可，工单还涉及按
+    顾客隔离，放进检索索引会多出一层泄露风险却不带来任何收益。
     """
     text = f"{section.get('title', '')} {section.get('section', '')} {section.get('content', '')}".strip()
     return {
@@ -206,19 +176,15 @@ def rebuild_from_store(drop: bool = False) -> dict:
     """从 MySQL 全量重建索引。
 
     在服务进程内调用可以避开 Milvus Lite 的文件独占锁问题。
+    只索引 FAQ：商品与工单按结构化条件查询，不进向量库。
     """
     from app import store
 
     if drop:
         clear()
 
-    products = store.all_products_for_index()
-    orders = store.all_work_orders_for_index()
     faqs = store.all_faq_for_index()
-
-    docs = [product_document(p) for p in products]
-    docs += [work_order_document(o) for o in orders]
-    docs += [faq_document(f) for f in faqs]
+    docs = [faq_document(f) for f in faqs]
 
     written = 0
     batch_size = 20
@@ -226,8 +192,6 @@ def rebuild_from_store(drop: bool = False) -> dict:
         written += upsert_documents(docs[start : start + batch_size])
 
     return {
-        "products": len(products),
-        "work_orders": len(orders),
         "faq": len(faqs),
         "total": len(docs),
         "written": written,

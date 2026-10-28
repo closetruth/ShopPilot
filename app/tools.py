@@ -49,35 +49,21 @@ def lookup_product(
         items = store.search_products(
             keyword=query.keyword, product_id=query.product_id
         )
+        if items:
+            return {"products": items, "count": len(items)}
+
+        # 关键词没命中时给出全部在售商品，由模型判断哪些相关。
+        # 商品规模小，全量返回比猜词更可靠
+        everything = store.search_products()
     except Exception:  # noqa: BLE001 - 数据库异常作为数据回给模型
         return {"error": "商品查询暂时不可用，请稍后重试"}
 
-    if items:
-        return {"products": items, "count": len(items), "match": "exact"}
-
-    # 字面匹配不到时退到语义检索：顾客常说「杯子」，而库里的品名是
-    # 「马克杯」「保温杯」，字面上对不上，语义上却完全相关
-    if query.keyword:
-        semantic = _semantic_products(query.keyword, runtime.context.visitor_id)
-        if semantic:
-            return {"products": semantic, "count": len(semantic), "match": "semantic"}
-
-    return {"products": [], "note": "没有找到匹配的商品"}
-
-
-def _semantic_products(keyword: str, visitor_id: str) -> list[dict]:
-    hits = vector_store.search(keyword, visitor_id, top_k=5)
-    ids = [
-        h["source_id"]
-        for h in hits
-        if h["source"] == "product" and h["score"] >= RELEVANCE_THRESHOLD
-    ]
-    products = []
-    for product_id in ids:
-        found = store.search_products(product_id=product_id)
-        if found:
-            products.append(found[0])
-    return products
+    return {
+        "products": everything,
+        "count": len(everything),
+        "note": f"没有匹配「{query.keyword}」的商品，以上是全部在售商品，"
+        "请据此判断是否有顾客想要的东西。",
+    }
 
 
 @tool
@@ -198,19 +184,20 @@ def search_knowledge(
     query: Annotated[str, "顾客问题的关键内容，用于语义检索，20 字以内"],
     top_k: Annotated[int, "返回条数，默认 3，最多 5"] = 3,
 ) -> dict:
-    """检索店内政策知识、商品资料与该顾客的历史工单。
+    """检索店内政策知识（退货、退款、运费、发票、物流、价保、会员、投诉）。
 
-    适用场景：顾客询问退货、退款、运费、发票、物流、价保、会员权益等
-    政策规则时，先查这里。也适用于描述模糊、不确定该查什么的情况。
+    顾客询问上述政策规则时先查这里。商品与订单不用查这个工具——
+    分别用 lookup_product 与 list_my_orders。
 
-    结果中 source 为 faq 的条目带 doc_id 与 title，回答政策类问题时应
-    说明依据哪份规则；相关度不足时返回空，此时按常规客服话术回答，
-    不要臆测政策条款。"""
-    visitor_id = runtime.context.visitor_id
+    结果带 doc_id 与 title，回答时应说明依据哪份规则；相关度不足时
+    返回空，此时按常规客服话术回答，不要臆测政策条款。"""
     top_k = max(1, min(int(top_k or 3), 5))
 
-    # 嵌入是同步 HTTP 调用，放进工具里会阻塞事件循环，LangGraph 会自动丢线程池执行
-    hits = vector_store.search(query, visitor_id, top_k=top_k)
+    # 嵌入是同步 HTTP 调用，放进工具里会阻塞事件循环，LangGraph 会丢线程池执行
+    hits = vector_store.search(query, "", top_k=top_k)
+
+    # 严格按相似度从高到低取前 K 条，不因回表失败而用低分条目补位
+    hits = sorted(hits, key=lambda h: h["score"], reverse=True)[:top_k]
     relevant = [h for h in hits if h["score"] >= RELEVANCE_THRESHOLD]
 
     if not relevant:
@@ -219,35 +206,29 @@ def search_knowledge(
             "note": "没有找到相关度足够的知识条目，请按常规客服话术回答，不要编造。",
         }
 
-    # FAQ 命中回表取正文与出处：向量里存的是拼接文本，直接给模型会缺少
-    # 标题层级，也无法标注依据来自哪条政策
-    enriched = []
+    # 内容一律取自 MySQL 原文：向量库里存的是为检索拼接、可能被截断的文本
+    results = []
     for hit in relevant:
-        if hit["source"] == "faq":
-            row = store.faq_by_id(hit["source_id"])
-            if row:
-                enriched.append(
-                    {
-                        "source": "faq",
-                        "doc_id": row["doc_id"],
-                        "title": row["title"],
-                        "category": row["category"],
-                        "section": row["section"],
-                        "content": row["content"],
-                        "score": hit["score"],
-                    }
-                )
-                continue
-        enriched.append(
+        row = store.faq_by_id(hit["source_id"])
+        if row is None:
+            continue
+        results.append(
             {
-                "source": hit["source"],
-                "source_id": hit["source_id"],
-                "content": hit["text"],
+                "doc_id": row["doc_id"],
+                "title": row["title"],
+                "category": row["category"],
+                "section": row["section"],
+                "content": row["content"],
                 "score": hit["score"],
             }
         )
 
-    return {"results": enriched, "count": len(enriched)}
+    if not results:
+        return {
+            "results": [],
+            "note": "命中的条目在数据库中已不存在，可能已被删除，请按查不到处理。",
+        }
+    return {"results": results, "count": len(results)}
 
 
 TOOLS = [

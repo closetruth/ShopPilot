@@ -241,20 +241,10 @@ async def confirm_work_order(req: WorkOrderConfirm) -> dict:
         logger.exception("提交工单失败")
         raise HTTPException(status_code=500, detail="提交失败，请稍后重试") from exc
 
-    _index_work_order(req.visitor_id, work_order_no)
-
     return {
         "created": True,
         "work_order": store.get_work_order(req.visitor_id, work_order_no),
     }
-
-
-def _index_work_order(visitor_id: str, work_order_no: str) -> None:
-    """双写到向量库。失败只记日志——MySQL 已写入，索引可重建。"""
-    row = store.get_work_order_row(visitor_id, work_order_no)
-    if row is None:
-        return
-    vector_store.upsert_documents([vector_store.work_order_document(row)])
 
 
 @app.post("/api/chat")

@@ -1,7 +1,9 @@
 """向量层测试。
 
-嵌入走真实 API、Milvus 用临时文件库。这些测试需要网络与
-SILICONFLOW_API_KEY，缺失时整体跳过。
+嵌入走真实 API、Milvus 用临时文件库。需要网络与 SILICONFLOW_API_KEY，
+缺失时整体跳过。
+
+向量索引只存 FAQ：商品与工单按结构化条件查询，不进向量库。
 """
 
 import os
@@ -30,6 +32,12 @@ def temp_vector_db(tmp_path, monkeypatch):
     vector_store.reset_client()
 
 
+def _faq_doc(faq_id: str, title: str, section: str, content: str) -> dict:
+    return vector_store.faq_document(
+        {"id": faq_id, "title": title, "section": section, "content": content}
+    )
+
+
 @requires_embedding
 def test_embed_returns_consistent_dimension():
     vectors = embed_texts(["杯子", "保温杯"])
@@ -41,8 +49,8 @@ def test_embed_returns_consistent_dimension():
 def test_embed_preserves_order():
     """批量返回的顺序必须与入参一致。
 
-    嵌入服务对同一文本的批量与单条调用可能存在浮点级差异，因此比较
-    余弦相似度而非逐位相等——只要对应项高度相似即说明顺序没错。
+    嵌入服务对同一文本的批量与单条调用可能有浮点级差异，因此比较
+    余弦相似度而非逐位相等。
     """
     texts = ["完全不同的第一条文本甲", "第二条文本乙", "第三条文本丙"]
     batch = embed_texts(texts)
@@ -57,7 +65,6 @@ def test_embed_preserves_order():
     for i in range(len(texts)):
         assert cosine(batch[i], singles[i]) > 0.999, f"第 {i} 条顺序错位"
 
-    # 交叉验证：错位的组合相似度应明显更低
     assert cosine(batch[0], singles[1]) < cosine(batch[1], singles[1])
 
 
@@ -78,130 +85,62 @@ def test_embed_missing_key_raises(monkeypatch):
         embedding._client.cache_clear()
 
 
-def test_product_document_is_public():
-    doc = vector_store.product_document(
-        {
-            "id": "p-mug-blue",
-            "name": "青花瓷马克杯",
-            "category": "杯具",
-            "color": "蓝色",
-            "description": "手工青花釉下彩",
-        }
-    )
-    assert doc["id"] == "product:p-mug-blue"
+def test_faq_document_embeds_title_and_section():
+    doc = _faq_doc("P-RET-001-3", "七天无理由退货规则", "运费承担", "退回运费由消费者承担")
+    assert doc["id"] == "faq:P-RET-001-3"
+    assert doc["source"] == "faq"
     assert doc["visitor_id"] == ""
-    assert "青花瓷马克杯" in doc["text"]
-    assert "蓝色" in doc["text"]
-
-
-def test_work_order_document_is_private():
-    doc = vector_store.work_order_document(
-        {
-            "work_order_no": "WO123",
-            "visitor_id": "visitor-a",
-            "issue_type": "运输破损",
-            "description": "杯口有裂纹",
-        }
-    )
-    assert doc["id"] == "work_order:WO123"
-    assert doc["visitor_id"] == "visitor-a"
-    assert "运输破损" in doc["text"]
+    assert "七天无理由退货规则" in doc["text"]
+    assert "运费承担" in doc["text"]
+    assert "退回运费由消费者承担" in doc["text"]
 
 
 @requires_embedding
 def test_upsert_and_search_roundtrip(temp_vector_db):
-    visitor = "v-" + uuid.uuid4().hex[:8]
     docs = [
-        vector_store.product_document(
-            {
-                "id": "p-test-1",
-                "name": "测试蓝色马克杯",
-                "category": "杯具",
-                "color": "蓝色",
-                "description": "用于向量测试的杯子",
-            }
-        ),
-        vector_store.work_order_document(
-            {
-                "work_order_no": "WO-TEST-1",
-                "visitor_id": visitor,
-                "issue_type": "运输破损",
-                "description": "收到时杯口有裂纹",
-            }
-        ),
+        _faq_doc("P-RET-001-3", "七天无理由退货规则", "运费承担", "退回运费由消费者承担"),
+        _faq_doc("P-INV-001-1", "发票开具与换开规则", "开具条件", "订单完成后可申请电子发票"),
     ]
     assert vector_store.upsert_documents(docs) == 2
 
-    hits = vector_store.search("杯子裂了", visitor, top_k=5)
+    hits = vector_store.search("退货运费谁出", "", top_k=5)
     assert hits
-    assert any(h["source"] == "work_order" for h in hits)
+    assert any(h["source_id"] == "P-RET-001-3" for h in hits)
 
 
 @requires_embedding
-def test_search_is_isolated_between_visitors(temp_vector_db):
-    owner = "owner-" + uuid.uuid4().hex[:8]
-    stranger = "stranger-" + uuid.uuid4().hex[:8]
-
+def test_search_returns_highest_score_first(temp_vector_db):
     vector_store.upsert_documents(
         [
-            vector_store.work_order_document(
-                {
-                    "work_order_no": "WO-SECRET-1",
-                    "visitor_id": owner,
-                    "issue_type": "运输破损",
-                    "description": "这位顾客的特殊破损情况",
-                }
-            )
+            _faq_doc("P-LOG-001-2", "物流延迟处理", "补偿标准", "物流停滞超过48小时发放10元券"),
+            _faq_doc("P-INV-001-1", "发票开具规则", "开具条件", "订单完成后可申请电子发票"),
         ]
     )
-
-    own_hits = vector_store.search("破损", owner, top_k=5)
-    assert any(h["source_id"] == "WO-SECRET-1" for h in own_hits)
-
-    other_hits = vector_store.search("破损", stranger, top_k=5)
-    assert all(h["source_id"] != "WO-SECRET-1" for h in other_hits)
+    hits = vector_store.search("快递不走了有补偿吗", "", top_k=5)
+    assert hits
+    scores = [h["score"] for h in hits]
+    assert scores == sorted(scores, reverse=True), "结果须按相似度降序"
 
 
 @requires_embedding
 def test_delete_by_source(temp_vector_db):
-    visitor = "v-" + uuid.uuid4().hex[:8]
     vector_store.upsert_documents(
-        [
-            vector_store.product_document(
-                {
-                    "id": "p-del-1",
-                    "name": "待删除测试商品",
-                    "category": "杯具",
-                    "color": "白色",
-                    "description": "删除测试",
-                }
-            )
-        ]
+        [_faq_doc("P-DEL-1", "待删除测试", "正文", "这是一条将被删除的测试知识")]
     )
-    assert vector_store.delete_by_source("product", "p-del-1")
-    hits = vector_store.search("待删除测试商品", visitor, top_k=5)
-    assert all(h["source_id"] != "p-del-1" for h in hits)
+    assert vector_store.delete_by_source("faq", "P-DEL-1")
+    hits = vector_store.search("待删除测试", "", top_k=5)
+    assert all(h["source_id"] != "P-DEL-1" for h in hits)
 
 
 def test_upsert_without_key_does_not_raise(monkeypatch, temp_vector_db):
-    """双写失败不应向调用方抛出——MySQL 已写入，索引可重建。"""
+    """写入失败不应向调用方抛出——MySQL 是事实来源，索引可重建。"""
     monkeypatch.setenv("SILICONFLOW_API_KEY", "")
     from app import embedding
 
     embedding._client.cache_clear()
     try:
         written = vector_store.upsert_documents(
-            [
-                vector_store.product_document(
-                    {
-                        "id": "p-nokey",
-                        "name": "无密钥测试",
-                        "category": "杯具",
-                        "color": "白色",
-                        "description": "测试",
-                    }
-                )
-            ]
+            [_faq_doc("P-NOKEY", "无密钥测试", "正文", "测试")]
         )
         assert written == 0
     finally:

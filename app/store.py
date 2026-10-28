@@ -692,61 +692,6 @@ def create_work_order(
     return work_order_no
 
 
-def get_work_order_row(visitor_id: str, work_order_no: str) -> dict | None:
-    """按工单号直接取一行，用于双写向量时取最新内容。"""
-    with _connect() as conn, conn.cursor() as cur:
-        return _fetch_work_order(cur, visitor_id, work_order_no)
-
-
-def _fetch_work_order(cur, visitor_id: str, work_order_no: str) -> dict | None:
-    cur.execute(
-        """
-        SELECT o.id, o.order_no, o.issue_type, o.status, o.issue AS description,
-               o.visitor_id, p.name AS product_name, p.color AS product_color
-          FROM work_orders o
-          LEFT JOIN products p ON p.id = o.product_id
-         WHERE o.visitor_id = %s AND o.id = %s
-         LIMIT 1
-        """,
-        (visitor_id, work_order_no),
-    )
-    row = cur.fetchone()
-    if row is None:
-        return None
-    return {
-        "work_order_no": row["id"],
-        "order_no": row["order_no"],
-        "issue_type": row["issue_type"],
-        "status": row["status"],
-        "description": row["description"],
-        "visitor_id": row["visitor_id"],
-        "product": (
-            f"{row['product_name']}（{row['product_color']}）"
-            if row["product_name"]
-            else None
-        ),
-    }
-
-
-def all_products_for_index() -> list[dict]:
-    """供向量重建脚本使用：全部商品。"""
-    with _connect() as conn, conn.cursor() as cur:
-        cur.execute(
-            "SELECT id, name, category, color, description FROM products"
-        )
-        return list(cur.fetchall())
-
-
-def all_work_orders_for_index() -> list[dict]:
-    """供向量重建脚本使用：全部工单（含 visitor_id 以便过滤）。"""
-    with _connect() as conn, conn.cursor() as cur:
-        cur.execute(
-            "SELECT id AS work_order_no, visitor_id, issue_type, issue AS description"
-            " FROM work_orders"
-        )
-        return list(cur.fetchall())
-
-
 def find_work_order(visitor_id: str, order_no: str) -> dict | None:
     """按订单号查该访客名下的工单。访客不匹配时返回 None，不区分「不存在」与「不属于你」。"""
     with _connect() as conn, conn.cursor() as cur:
