@@ -5,7 +5,11 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
-data/
+# 运行时数据不入库，但政策文档是业务资产需要留痕
+data/*
+!data/faq/
+data/faq/*
+!data/faq/*.md
 *.db
 *.sqlite3
 .DS_Store

@@ -107,6 +107,22 @@ def work_order_document(order: dict) -> dict:
     }
 
 
+def faq_document(section: dict) -> dict:
+    """政策知识向量：公开数据，全店顾客可见。
+
+    标题与小节名一并嵌入——只嵌正文会丢掉主题线索，
+    比如「运费承担」小节单看正文不易判断属于退货还是换货。
+    """
+    text = f"{section.get('title', '')} {section.get('section', '')} {section.get('content', '')}".strip()
+    return {
+        "id": f"faq:{section['id']}",
+        "source": "faq",
+        "source_id": section["id"],
+        "visitor_id": "",
+        "text": text[:TEXT_MAX],
+    }
+
+
 # ---------- 写入 ----------
 
 
@@ -198,9 +214,11 @@ def rebuild_from_store(drop: bool = False) -> dict:
 
     products = store.all_products_for_index()
     orders = store.all_work_orders_for_index()
+    faqs = store.all_faq_for_index()
 
     docs = [product_document(p) for p in products]
     docs += [work_order_document(o) for o in orders]
+    docs += [faq_document(f) for f in faqs]
 
     written = 0
     batch_size = 20
@@ -210,6 +228,7 @@ def rebuild_from_store(drop: bool = False) -> dict:
     return {
         "products": len(products),
         "work_orders": len(orders),
+        "faq": len(faqs),
         "total": len(docs),
         "written": written,
     }

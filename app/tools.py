@@ -198,10 +198,14 @@ def search_knowledge(
     query: Annotated[str, "顾客问题的关键内容，用于语义检索，20 字以内"],
     top_k: Annotated[int, "返回条数，默认 3，最多 5"] = 3,
 ) -> dict:
-    """按语义检索店内知识与该顾客的历史工单。当顾客的问题涉及商品特征、
-    常见问题、或者需要参考过往工单时使用。结果只含语义相关度较高的条目，
-    相关度不足时返回空，表示没有可参考的资料——此时按常规客服话术回答，
-    不要臆测。"""
+    """检索店内政策知识、商品资料与该顾客的历史工单。
+
+    适用场景：顾客询问退货、退款、运费、发票、物流、价保、会员权益等
+    政策规则时，先查这里。也适用于描述模糊、不确定该查什么的情况。
+
+    结果中 source 为 faq 的条目带 doc_id 与 title，回答政策类问题时应
+    说明依据哪份规则；相关度不足时返回空，此时按常规客服话术回答，
+    不要臆测政策条款。"""
     visitor_id = runtime.context.visitor_id
     top_k = max(1, min(int(top_k or 3), 5))
 
@@ -214,7 +218,36 @@ def search_knowledge(
             "results": [],
             "note": "没有找到相关度足够的知识条目，请按常规客服话术回答，不要编造。",
         }
-    return {"results": relevant, "count": len(relevant)}
+
+    # FAQ 命中回表取正文与出处：向量里存的是拼接文本，直接给模型会缺少
+    # 标题层级，也无法标注依据来自哪条政策
+    enriched = []
+    for hit in relevant:
+        if hit["source"] == "faq":
+            row = store.faq_by_id(hit["source_id"])
+            if row:
+                enriched.append(
+                    {
+                        "source": "faq",
+                        "doc_id": row["doc_id"],
+                        "title": row["title"],
+                        "category": row["category"],
+                        "section": row["section"],
+                        "content": row["content"],
+                        "score": hit["score"],
+                    }
+                )
+                continue
+        enriched.append(
+            {
+                "source": hit["source"],
+                "source_id": hit["source_id"],
+                "content": hit["text"],
+                "score": hit["score"],
+            }
+        )
+
+    return {"results": enriched, "count": len(enriched)}
 
 
 TOOLS = [

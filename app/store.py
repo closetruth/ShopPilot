@@ -45,6 +45,20 @@ CREATE TABLE IF NOT EXISTS products (
     KEY idx_products_category (category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS faq_documents (
+    id          VARCHAR(64)   NOT NULL PRIMARY KEY,
+    doc_id      VARCHAR(32)   NOT NULL,
+    title       VARCHAR(128)  NOT NULL,
+    category    VARCHAR(32)   NOT NULL,
+    version     VARCHAR(32)   NOT NULL DEFAULT '',
+    section     VARCHAR(128)  NOT NULL,
+    content     TEXT          NOT NULL,
+    source      VARCHAR(256)  NOT NULL DEFAULT '',
+    updated_at  DATETIME(6)   NOT NULL,
+    KEY idx_faq_doc (doc_id),
+    KEY idx_faq_category (category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS orders (
     order_no    VARCHAR(32)   NOT NULL PRIMARY KEY,
     visitor_id  VARCHAR(64)   NOT NULL,
@@ -764,6 +778,69 @@ def find_work_order(visitor_id: str, order_no: str) -> dict | None:
         "created_at": row["created_at"].isoformat(),
         "updated_at": row["updated_at"].isoformat(),
     }
+
+
+def upsert_faq_document(doc: dict) -> None:
+    """写入或更新一条 FAQ 小节。"""
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO faq_documents
+                (id, doc_id, title, category, version, section, content,
+                 source, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                title = VALUES(title), category = VALUES(category),
+                version = VALUES(version), section = VALUES(section),
+                content = VALUES(content), source = VALUES(source),
+                updated_at = VALUES(updated_at)
+            """,
+            (
+                doc["id"],
+                doc["doc_id"],
+                doc["title"],
+                doc["category"],
+                doc.get("version", ""),
+                doc["section"],
+                doc["content"],
+                doc.get("source", ""),
+                _now(),
+            ),
+        )
+
+
+def all_faq_for_index() -> list[dict]:
+    """供向量重建使用：全部 FAQ 小节。"""
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, doc_id, title, category, section, content FROM faq_documents"
+        )
+        return list(cur.fetchall())
+
+
+def faq_by_id(faq_id: str) -> dict | None:
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, doc_id, title, category, section, content"
+            " FROM faq_documents WHERE id = %s",
+            (faq_id,),
+        )
+        return cur.fetchone()
+
+
+def list_faq(category: str | None = None) -> list[dict]:
+    sql = (
+        "SELECT id, doc_id, title, category, section, content"
+        " FROM faq_documents WHERE 1=1"
+    )
+    params: list = []
+    if category:
+        sql += " AND category = %s"
+        params.append(category)
+    sql += " ORDER BY doc_id, id"
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        return list(cur.fetchall())
 
 
 def _title_of(text: str | None) -> str:
