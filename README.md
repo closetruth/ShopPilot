@@ -77,6 +77,15 @@ plans/         实施计划
 浏览器打开 `/admin`，可查看、新建、编辑、停用、删除政策知识。
 保存后立即同步向量索引，无需手动重建。
 
+**批量导入**：顶栏「批量导入」可粘贴 Markdown 文档，按标题层级自动切成
+多条知识，预览确认后一次入库。单节超过 500 字按段落再切；代码围栏与表格
+内部的 `#` 不会被当成标题。
+
+```
+POST   /api/admin/faq/bulk/preview        切分预览（不写库）
+POST   /api/admin/faq/bulk                批量入库（≤200 条）
+```
+
 ```
 GET    /api/admin/faq                     列表（含停用项）
 GET    /api/admin/faq/categories          分类与条目数
