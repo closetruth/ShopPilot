@@ -64,6 +64,39 @@ def create_document(
     return faq_id
 
 
+def create_documents(
+    title: str, category: str, items: list[dict]
+) -> list[str]:
+    """批量新建知识，单事务写入。返回与 items 顺序一致的 id 列表。
+
+    批量导入一份文档会切出几十条，逐条开事务既慢又可能出现「写了一半」。
+    这里用一次 executemany，要么全成要么全败。
+    """
+    if not items:
+        return []
+
+    rows = []
+    ids = []
+    ts = now()
+    for item in items:
+        faq_id = "faq-" + uuid.uuid4().hex[:12]
+        ids.append(faq_id)
+        rows.append((faq_id, faq_id, title, category, item["section"],
+                     item["content"], ts))
+
+    with connect() as conn, conn.cursor() as cur:
+        cur.executemany(
+            """
+            INSERT INTO faq_documents
+                (id, doc_id, title, category, version, section, content,
+                 source, enabled, updated_at)
+            VALUES (%s, %s, %s, %s, '', %s, %s, 'web', 1, %s)
+            """,
+            rows,
+        )
+    return ids
+
+
 def update_document(
     faq_id: str, title: str, section: str, category: str, content: str
 ) -> bool:

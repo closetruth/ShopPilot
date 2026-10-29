@@ -26,11 +26,11 @@
 
 ## 步骤 3：批量入库仓储
 
-- [ ] `app/repo/knowledge.py` 新增 `create_documents(title, category, items)`
-- [ ] 单事务 `executemany`，id 为 `faq-{uuid12}`，`source='web'`
-- [ ] `app/store.py` 导出 `create_faq_documents`
-- [ ] 验证：直接调用确认多条写入
-- [ ] 提交
+- [x] `app/repo/knowledge.py` 新增 `create_documents(title, category, items)`
+- [x] 单事务 `executemany`，id 为 `faq-{uuid12}`，`source='web'`
+- [x] `app/store.py` 导出 `create_faq_documents`
+- [x] 验证：直接调用确认多条写入
+- [x] 提交
 
 ## 步骤 4：批量导入接口
 
