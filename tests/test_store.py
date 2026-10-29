@@ -160,14 +160,12 @@ def test_create_work_order_and_find_it(visitor):
 def test_create_work_order_forces_server_side_fields(visitor):
     import pymysql
 
+    from app.db import conn_params
+
     work_order_no = store.create_work_order(
         visitor, "ORDER20990002", "质量问题", "内胆涂层脱落，使用一周后出现"
     )
-    conn = pymysql.connect(
-        host="127.0.0.1", port=3307, user="shoppilot",
-        password="shoppilot", database="shoppilot",
-        cursorclass=pymysql.cursors.DictCursor,
-    )
+    conn = pymysql.connect(**conn_params())
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -214,10 +212,9 @@ def _insert_order(visitor_id: str, order_no: str, product_id: str | None = None)
     """测试自备订单数据，不依赖 seed 的共享演示数据。"""
     import pymysql
 
-    conn = pymysql.connect(
-        host="127.0.0.1", port=3307, user="shoppilot",
-        password="shoppilot", database="shoppilot",
-    )
+    from app.db import conn_params
+
+    conn = pymysql.connect(**conn_params())
     try:
         with conn.cursor() as cur:
             cur.execute(

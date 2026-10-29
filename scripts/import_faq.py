@@ -63,6 +63,11 @@ def split_sections(body: str) -> list[tuple[str, str]]:
 def build_documents() -> list[dict]:
     docs: list[dict] = []
     for path in sorted(FAQ_DIR.glob("*.md")):
+        # README 是给人看的说明，不是政策内容。早先没排除，它被当成一篇
+        # 政策解析出 4 条「未分类」知识，顾客检索时会命中这些说明文字。
+        if path.name.lower() == "readme.md":
+            continue
+
         text = path.read_text(encoding="utf-8-sig")
         meta, body = parse_frontmatter(text)
 

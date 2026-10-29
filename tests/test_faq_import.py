@@ -72,6 +72,16 @@ def test_build_documents_from_repo_faq():
         assert len(doc["content"]) > 0
 
 
+def test_build_documents_skips_readme():
+    """README 是给人看的说明，不是政策，不该被解析成知识条目。"""
+    docs = build_documents()
+    sources = {d["source"] for d in docs}
+    assert "README.md" not in sources, f"README 被导入了：{[s for s in sources if 'README' in s.upper()]}"
+
+    categories = {d["category"] for d in docs}
+    assert "未分类" not in categories, "无 frontmatter 的说明文件混入了知识库"
+
+
 def test_build_documents_ids_are_unique():
     docs = build_documents()
     ids = [d["id"] for d in docs]
