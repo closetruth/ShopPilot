@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app import store, vector_store
 from app.agent import build_agent
 from app.llm import ConfigError, get_llm
+from app.markdown_split import split_markdown
 from app.schemas import WorkOrderCreate
 from app.tools import AgentContext
 
@@ -244,6 +245,119 @@ async def admin_delete_faq(faq_id: str) -> dict:
 @app.get("/admin")
 async def admin_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "admin.html")
+
+
+# ---------- 批量导入 ----------
+
+
+class BulkPreviewRequest(BaseModel):
+    markdown: str = Field(min_length=1, max_length=100_000)
+    title: str | None = Field(default=None, max_length=64)
+    category: str | None = Field(default=None, max_length=32)
+    section_mode: str = Field(default="leaf", pattern="^(leaf|path)$")
+    max_chars: int = Field(default=500, ge=200, le=2000)
+
+
+class BulkItem(BaseModel):
+    """只做类型约束。长度规则统一交给 FaqPayload 校验，
+    这样报错能带上「第 N 条」的下标，而不是 Pydantic 默认的数组索引。"""
+
+    section: str
+    content: str
+
+
+class BulkImportRequest(BaseModel):
+    title: str
+    category: str
+    items: list[BulkItem]
+
+
+@app.post("/api/admin/faq/bulk/preview")
+async def admin_bulk_preview(req: BulkPreviewRequest) -> dict:
+    """切分预览。纯计算，不写库、不调嵌入。
+
+    切分是启发式的，同一份文档可能有多种合理切法。必须让人先看清
+    切了什么，再决定是否入库。
+    """
+    result = split_markdown(
+        req.markdown,
+        title=req.title,
+        category=req.category,
+        max_chars=req.max_chars,
+        section_mode=req.section_mode,
+    )
+
+    sections = [c.section for c in result.chunks]
+    duplicates = sorted({s for s in sections if sections.count(s) > 1})
+
+    return {
+        "title": result.title,
+        "category": result.category,
+        "chunks": [
+            {
+                "index": i,
+                "section": c.section,
+                "content": c.content,
+                "chars": c.chars,
+                "path": c.path,
+                "kind": c.kind,
+                "warnings": c.warnings,
+            }
+            for i, c in enumerate(result.chunks)
+        ],
+        "summary": {
+            "chunks": len(result.chunks),
+            "too_short": sum(1 for c in result.chunks if c.chars < 20),
+            "duplicate_sections": duplicates,
+        },
+        "warnings": result.warnings,
+    }
+
+
+@app.post("/api/admin/faq/bulk")
+async def admin_bulk_import(req: BulkImportRequest) -> dict:
+    """批量入库。全部校验通过才写，写完全量写一次向量。"""
+    if not req.items:
+        raise HTTPException(status_code=422, detail="至少需要一条知识")
+    if len(req.items) > 200:
+        raise HTTPException(
+            status_code=422, detail=f"单次最多 200 条，当前 {len(req.items)} 条"
+        )
+
+    for i, item in enumerate(req.items):
+        try:
+            FaqPayload(
+                title=req.title,
+                section=item.section,
+                category=req.category,
+                content=item.content,
+            )
+        except ValidationError as exc:
+            detail = "; ".join(
+                f"{'.'.join(str(p) for p in err['loc']) or '字段'}: {err['msg']}"
+                for err in exc.errors()
+            )
+            raise HTTPException(
+                status_code=422, detail=f"第 {i + 1} 条不合法：{detail}"
+            ) from exc
+
+    ids = store.create_faq_documents(
+        title=req.title,
+        category=req.category,
+        items=[{"section": i.section, "content": i.content} for i in req.items],
+    )
+
+    docs = [vector_store.faq_document(store.faq_by_id(i)) for i in ids]
+    indexed = vector_store.upsert_documents(docs)
+
+    return {
+        "created": [
+            {"id": faq_id, "section": item.section}
+            for faq_id, item in zip(ids, req.items)
+        ],
+        "indexed": indexed,
+        "total": len(ids),
+    }
 
 
 class WorkOrderConfirm(BaseModel):

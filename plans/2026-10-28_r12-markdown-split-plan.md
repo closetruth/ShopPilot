@@ -34,14 +34,14 @@
 
 ## 步骤 4：批量导入接口
 
-- [ ] `POST /api/admin/faq/bulk/preview`：纯计算，不入库不嵌入
-- [ ] `POST /api/admin/faq/bulk`：校验全部条目 → 批量写入 → 一次批量嵌入
-- [ ] 复用 `FaqPayload` 约束；422 带 item 下标
-- [ ] 响应回传 `indexed` 数，供前端提示重建索引
-- [ ] `tests/test_admin_bulk.py`：preview 不落库、bulk 全成或全败、
+- [x] `POST /api/admin/faq/bulk/preview`：纯计算，不入库不嵌入
+- [x] `POST /api/admin/faq/bulk`：校验全部条目 → 批量写入 → 一次批量嵌入
+- [x] 复用 `FaqPayload` 约束；422 带 item 下标
+- [x] 响应回传 `indexed` 数，供前端提示重建索引
+- [x] `tests/test_admin_bulk.py`：preview 不落库、bulk 全成或全败、
       200 条上限、校验失败下标
-- [ ] 验证：`uv run pytest tests/test_admin_bulk.py -q`
-- [ ] 提交
+- [x] 验证：`uv run pytest tests/test_admin_bulk.py -q`
+- [x] 提交
 
 ## 步骤 5：前端批量导入
 
