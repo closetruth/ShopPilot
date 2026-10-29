@@ -45,13 +45,13 @@
 
 ## 步骤 5：前端批量导入
 
-- [ ] `admin.html`：顶栏按钮 + `<dialog>` 两步结构
-- [ ] `admin.js`：预览请求、渲染列表、勾选、确认导入
-- [ ] 徽标：过短 / 第 i/n 段 / 节引言 / 标题截断
-- [ ] 修 `renderCategories` 不清空 `#catOptions` 导致 datalist 累积重复
-- [ ] `admin.css`：对话框与预览列表样式
-- [ ] 验证：浏览器实跑粘贴 → 预览 → 导入 → 检索
-- [ ] 提交
+- [x] `admin.html`：顶栏按钮 + `<dialog>` 两步结构
+- [x] `admin.js`：预览请求、渲染列表、勾选、确认导入
+- [x] 徽标：过短 / 第 i/n 段 / 节引言 / 标题截断
+- [x] 修 `renderCategories` 不清空 `#catOptions` 导致 datalist 累积重复
+- [x] `admin.css`：对话框与预览列表样式
+- [x] 验证：浏览器实跑粘贴 → 预览 → 导入 → 检索
+- [x] 提交
 
 ## 步骤 6：文档
 

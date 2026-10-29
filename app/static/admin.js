@@ -19,6 +19,7 @@ const els = {
   status: document.getElementById("editorStatus"),
   newBtn: document.getElementById("newBtn"),
   resyncBtn: document.getElementById("resyncBtn"),
+  bulkBtn: document.getElementById("bulkBtn"),
 };
 
 /** 当前编辑项。null 表示新建或未选中。 */
@@ -51,6 +52,8 @@ function setStatus(text, isError = false) {
 
 function renderCategories(cats) {
   els.catList.replaceChildren();
+  // datalist 也要清空：不清会在每次 refresh 后累积重复的 option
+  els.catOptions.replaceChildren();
 
   const total = items.length;
   const all = document.createElement("button");
@@ -292,6 +295,276 @@ async function resync() {
     els.resyncBtn.disabled = false;
   }
 }
+
+/* ---------- 批量导入 ---------- */
+
+const imp = {
+  dialog: document.getElementById("importDialog"),
+  step1: document.getElementById("importStep1"),
+  step2: document.getElementById("importStep2"),
+  heading: document.getElementById("importHeading"),
+  text: document.getElementById("importText"),
+  title: document.getElementById("importTitle"),
+  category: document.getElementById("importCategory"),
+  pathMode: document.getElementById("importPathMode"),
+  maxChars: document.getElementById("importMaxChars"),
+  hint: document.getElementById("importHint"),
+  previewHint: document.getElementById("importPreviewHint"),
+  previewBtn: document.getElementById("importPreviewBtn"),
+  backBtn: document.getElementById("importBackBtn"),
+  confirmBtn: document.getElementById("importConfirmBtn"),
+  status: document.getElementById("importStatus"),
+  confirmStatus: document.getElementById("importConfirmStatus"),
+  summary: document.getElementById("importSummary"),
+  list: document.getElementById("previewList"),
+  close: document.getElementById("importClose"),
+};
+
+/** 预览返回的条目；确认导入时从这份数据里挑勾选的那些。 */
+let previewChunks = [];
+
+function impHint(el, text, isError = false) {
+  if (!text) {
+    el.hidden = true;
+    return;
+  }
+  el.textContent = text;
+  el.classList.toggle("error", isError);
+  el.hidden = false;
+}
+
+function openImport() {
+  imp.step1.hidden = false;
+  imp.step2.hidden = true;
+  imp.heading.textContent = "批量导入";
+  impHint(imp.hint, "");
+  impHint(imp.previewHint, "");
+  imp.status.textContent = "";
+  imp.confirmStatus.textContent = "";
+  if (!imp.category.value && currentCategory) {
+    imp.category.value = currentCategory;
+  }
+  imp.dialog.showModal();
+  imp.text.focus();
+}
+
+function closeImport() {
+  imp.dialog.close();
+  previewChunks = [];
+}
+
+async function doPreview() {
+  const markdown = imp.text.value.trim();
+  if (!markdown) {
+    impHint(imp.hint, "请先粘贴文档内容", true);
+    return;
+  }
+
+  imp.previewBtn.disabled = true;
+  impHint(imp.hint, "");
+  imp.status.textContent = "解析中…";
+
+  try {
+    const res = await fetch("/api/admin/faq/bulk/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        markdown,
+        title: imp.title.value.trim() || null,
+        category: imp.category.value.trim() || null,
+        section_mode: imp.pathMode.checked ? "path" : "leaf",
+        max_chars: Number(imp.maxChars.value) || 500,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detail =
+        typeof err.detail === "string"
+          ? err.detail
+          : (err.detail || []).map((d) => d.msg).join("；") || "HTTP " + res.status;
+      throw new Error(detail);
+    }
+
+    const data = await res.json();
+    previewChunks = data.chunks;
+
+    // 标题与分类回填：用户留空时由文档内的 frontmatter/H1 提供
+    if (!imp.title.value.trim() && data.title) imp.title.value = data.title;
+    if (!imp.category.value.trim() && data.category) imp.category.value = data.category;
+
+    renderPreview(data);
+    imp.status.textContent = "";
+    imp.step1.hidden = true;
+    imp.step2.hidden = false;
+  } catch (err) {
+    impHint(imp.hint, err.message, true);
+    imp.status.textContent = "";
+  } finally {
+    imp.previewBtn.disabled = false;
+  }
+}
+
+function renderPreview(data) {
+  const s = data.summary;
+  const parts = [`共 ${s.chunks} 条`];
+  if (s.too_short) parts.push(`${s.too_short} 条不足 20 字`);
+  if (s.duplicate_sections.length) {
+    parts.push(`${s.duplicate_sections.length} 个重名小节`);
+  }
+  imp.summary.textContent = parts.join(" · ");
+
+  const notes = [];
+  if (s.too_short) {
+    notes.push("过短的条目入库会被拒，请在原文补充内容或取消勾选。");
+  }
+  if (s.duplicate_sections.length) {
+    notes.push(
+      "重名小节会产生近似重复的向量，可勾选「用小节路径命名」后重新解析。"
+    );
+  }
+  if (data.warnings && data.warnings.length) {
+    notes.push(...data.warnings);
+  }
+  impHint(imp.previewHint, notes.join(" "));
+
+  imp.list.replaceChildren();
+  data.chunks.forEach((chunk, i) => {
+    imp.list.appendChild(renderPreviewRow(chunk, i));
+  });
+
+  updateConfirmLabel();
+}
+
+function renderPreviewRow(chunk, index) {
+  const row = document.createElement("label");
+  row.className = "preview-row";
+
+  const box = document.createElement("input");
+  box.type = "checkbox";
+  box.className = "preview-check";
+  box.checked = chunk.chars >= 20;
+  box.dataset.index = String(index);
+  box.addEventListener("change", updateConfirmLabel);
+
+  const main = document.createElement("div");
+  main.className = "preview-main";
+
+  const head = document.createElement("div");
+  head.className = "preview-head";
+
+  const name = document.createElement("span");
+  name.className = "preview-section";
+  name.textContent = chunk.section;
+
+  const size = document.createElement("span");
+  size.className = "preview-size";
+  size.textContent = chunk.chars + " 字";
+
+  head.append(name, size);
+
+  if (chunk.kind === "preamble") {
+    head.appendChild(makeBadge("节引言", "info"));
+  }
+  if (chunk.part) {
+    head.appendChild(makeBadge(`第 ${chunk.part[0]}/${chunk.part[1]} 段`, "info"));
+  }
+  if (chunk.chars < 20) {
+    head.appendChild(makeBadge("过短", "warn"));
+  }
+
+  const excerpt = document.createElement("div");
+  excerpt.className = "preview-excerpt";
+  excerpt.textContent = chunk.content.slice(0, 100);
+
+  main.append(head, excerpt);
+  row.append(box, main);
+  return row;
+}
+
+function makeBadge(text, kind) {
+  const el = document.createElement("span");
+  el.className = "preview-badge preview-badge-" + kind;
+  el.textContent = text;
+  return el;
+}
+
+function selectedChunks() {
+  const picked = [];
+  for (const box of imp.list.querySelectorAll(".preview-check")) {
+    if (box.checked) picked.push(previewChunks[Number(box.dataset.index)]);
+  }
+  return picked;
+}
+
+function updateConfirmLabel() {
+  const n = selectedChunks().length;
+  imp.confirmBtn.textContent = n ? `确认导入 ${n} 条` : "确认导入";
+  imp.confirmBtn.disabled = n === 0;
+}
+
+async function doImport() {
+  const picked = selectedChunks();
+  if (!picked.length) return;
+
+  const title = imp.title.value.trim();
+  const category = imp.category.value.trim();
+  if (title.length < 2) {
+    impHint(imp.previewHint, "标题至少 2 个字", true);
+    return;
+  }
+  if (!category) {
+    impHint(imp.previewHint, "请填写分类", true);
+    return;
+  }
+
+  imp.confirmBtn.disabled = true;
+  imp.confirmStatus.textContent = "导入中…";
+
+  try {
+    const res = await fetch("/api/admin/faq/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        category,
+        items: picked.map((c) => ({ section: c.section, content: c.content })),
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detail =
+        typeof err.detail === "string"
+          ? err.detail
+          : (err.detail || []).map((d) => d.msg).join("；") || "HTTP " + res.status;
+      throw new Error(detail);
+    }
+
+    const data = await res.json();
+    closeImport();
+    await refresh();
+    setStatus(
+      data.indexed < data.total
+        ? `已导入 ${data.total} 条，仅 ${data.indexed} 条进入索引，请点「重建索引」`
+        : `已导入 ${data.total} 条并写入索引`,
+      data.indexed < data.total
+    );
+  } catch (err) {
+    impHint(imp.previewHint, err.message, true);
+    imp.confirmStatus.textContent = "";
+    imp.confirmBtn.disabled = false;
+  }
+}
+
+els.bulkBtn.addEventListener("click", openImport);
+imp.close.addEventListener("click", closeImport);
+imp.previewBtn.addEventListener("click", doPreview);
+imp.backBtn.addEventListener("click", () => {
+  imp.step1.hidden = false;
+  imp.step2.hidden = true;
+});
+imp.confirmBtn.addEventListener("click", doImport);
 
 /* ---------- 启动 ---------- */
 

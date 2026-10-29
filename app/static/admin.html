@@ -14,6 +14,7 @@
       <div class="admin-actions">
         <span class="admin-count" id="count"></span>
         <button class="btn" id="resyncBtn" type="button">重建索引</button>
+        <button class="btn" id="bulkBtn" type="button">批量导入</button>
         <button class="btn btn-primary" id="newBtn" type="button">新建知识</button>
         <a class="btn btn-link" href="/">返回对话</a>
       </div>
@@ -70,6 +71,68 @@
       </section>
     </div>
   </div>
+
+  <dialog class="import-dialog" id="importDialog">
+    <div class="import-head">
+      <h2 id="importHeading">批量导入</h2>
+      <button class="orders-close" id="importClose" type="button" aria-label="关闭">×</button>
+    </div>
+
+    <div class="import-body">
+      <section class="import-step" id="importStep1">
+        <p class="import-tip">
+          粘贴 Markdown 文档，按标题层级自动切成多条知识。
+          单节超过 <span id="maxCharsHint">500</span> 字会按段落再切。
+        </p>
+
+        <label class="import-label" for="importText">文档内容</label>
+        <textarea id="importText" class="import-textarea" rows="16"
+                  placeholder="# 售后手册&#10;&#10;## 退货流程&#10;&#10;客户提交退货申请后……"></textarea>
+
+        <div class="import-row">
+          <div class="field">
+            <label for="importTitle">标题 <span class="field-meta-inline">留空则取文档内标题</span></label>
+            <input id="importTitle" type="text" maxlength="64">
+          </div>
+          <div class="field">
+            <label for="importCategory">分类</label>
+            <input id="importCategory" type="text" maxlength="32" list="catOptions">
+          </div>
+        </div>
+
+        <div class="import-row">
+          <label class="import-checkbox">
+            <input id="importPathMode" type="checkbox">
+            用小节路径命名（如「退货 / 七天无理由」）
+          </label>
+          <div class="field field-inline">
+            <label for="importMaxChars">单节上限</label>
+            <input id="importMaxChars" type="number" min="200" max="2000" step="100" value="500">
+          </div>
+        </div>
+
+        <p class="editor-hint" id="importHint" hidden></p>
+
+        <div class="import-actions">
+          <button class="btn btn-primary" type="button" id="importPreviewBtn">解析预览</button>
+          <span class="editor-status" id="importStatus"></span>
+        </div>
+      </section>
+
+      <section class="import-step" id="importStep2" hidden>
+        <p class="import-summary" id="importSummary"></p>
+        <p class="editor-hint" id="importPreviewHint" hidden></p>
+        <div class="preview-list" id="previewList"></div>
+
+        <div class="import-actions">
+          <button class="btn" type="button" id="importBackBtn">返回修改</button>
+          <button class="btn btn-primary" type="button" id="importConfirmBtn">确认导入</button>
+          <span class="editor-status" id="importConfirmStatus"></span>
+        </div>
+      </section>
+    </div>
+  </dialog>
+
   <script type="module" src="/admin.js"></script>
 </body>
 </html>
