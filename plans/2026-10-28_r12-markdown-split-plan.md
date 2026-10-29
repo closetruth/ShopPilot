@@ -4,17 +4,17 @@
 
 ## 步骤 1：切分核心模块
 
-- [ ] 新建 `app/markdown_split.py`：`SplitResult` / `Chunk` 数据类
-- [ ] `parse_frontmatter()` 从 `scripts/import_faq.py` 移入
-- [ ] 逐行状态机：围栏（``` 与 ~~~）、表格、标题识别
-- [ ] 标题栈建树，叶子成条，父节点直属正文按长度决定独立或合并
-- [ ] 超长按段落装箱，单段回退句末或硬切，表格按行切并重复表头
-- [ ] 碎块合并、section 后缀 `（i/n）`、64 字截断
-- [ ] `legacy=True` 分支：只认 `##` 且平铺
-- [ ] `tests/test_markdown_split.py`：多级标题、围栏、表格、
+- [x] 新建 `app/markdown_split.py`：`SplitResult` / `Chunk` 数据类
+- [x] `parse_frontmatter()` 从 `scripts/import_faq.py` 移入
+- [x] 逐行状态机：围栏（``` 与 ~~~）、表格、标题识别
+- [x] 标题栈建树，叶子成条，父节点直属正文按长度决定独立或合并
+- [x] 超长按段落装箱，单段回退句末或硬切
+- [x] 过短条目打警告但不跨节合并、section 后缀 `（i/n）`、64 字截断
+- [x] `legacy=True` 分支：只认 `##` 且平铺，不切长不合并
+- [x] `tests/test_markdown_split.py`：多级标题、围栏、表格、
       超长切块、深路径截断、CRLF、未闭合围栏、空文档
-- [ ] 验证：`uv run pytest tests/test_markdown_split.py -q`
-- [ ] 提交
+- [x] 验证：`uv run pytest tests/test_markdown_split.py -q`
+- [x] 提交
 
 ## 步骤 2：脚本兼容
 
