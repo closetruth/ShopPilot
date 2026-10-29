@@ -2,7 +2,8 @@
 
 import pytest
 
-from scripts.import_faq import build_documents, parse_frontmatter, split_sections
+from app.markdown_split import parse_frontmatter, split_markdown
+from scripts.import_faq import build_documents
 
 
 SAMPLE = """---
@@ -36,9 +37,14 @@ def test_parse_frontmatter_without_header():
     assert body == "## 无头部\n正文"
 
 
+def _sections(body: str) -> list[tuple[str, str]]:
+    """脚本使用的 legacy 切分结果。"""
+    return [(c.section, c.content) for c in split_markdown(body, legacy=True).chunks]
+
+
 def test_split_sections():
     _, body = parse_frontmatter(SAMPLE)
-    sections = split_sections(body)
+    sections = _sections(body)
     assert len(sections) == 2
     assert sections[0][0] == "第一节"
     assert sections[0][1] == "正文一。"
@@ -47,15 +53,11 @@ def test_split_sections():
 
 
 def test_split_sections_without_heading():
-    sections = split_sections("只有正文，没有小节标题。")
-    assert sections == [("全文", "只有正文，没有小节标题。")]
+    assert _sections("只有正文，没有小节标题。") == [("全文", "只有正文，没有小节标题。")]
 
 
 def test_split_sections_skips_empty():
-    body = "## 有内容\n正文\n\n## 空小节\n\n"
-    sections = split_sections(body)
-    assert len(sections) == 1
-    assert sections[0][0] == "有内容"
+    assert len(_sections("## 有内容\n正文\n\n## 空小节\n\n")) == 1
 
 
 def test_build_documents_from_repo_faq():
@@ -94,3 +96,65 @@ def test_faq_covers_core_policy_areas():
     categories = {d["category"] for d in docs}
     for required in ("退货", "退款", "物流"):
         assert required in categories, f"缺少「{required}」类政策"
+
+
+# ---------- golden：与旧实现逐字一致 ----------
+
+
+def _old_split_sections(body: str) -> list[tuple[str, str]]:
+    """重构前的 split_sections，作为兼容性基准。
+
+    逐行照搬旧实现，用来锁死「legacy 模式输出必须与历史完全一致」。
+    脚本的 id 是 {doc_id}-{序号}，切分结果一变，存量条目就会被删重建。
+    """
+    import re
+
+    pattern = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+    matches = list(pattern.finditer(body))
+    if not matches:
+        text = body.strip()
+        return [("全文", text)] if text else []
+
+    sections = []
+    for i, match in enumerate(matches):
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
+        content = body[start:end].strip()
+        if content:
+            sections.append((match.group(1).strip(), content))
+    return sections
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted(p for p in (__import__("pathlib").Path("data/faq")).glob("P-*.md")),
+    ids=lambda p: p.stem,
+)
+def test_legacy_matches_old_implementation(path):
+    """each(data/faq/*.md) 上，legacy 模式与旧 split_sections 逐字相等。"""
+    text = path.read_text(encoding="utf-8-sig")
+    _, body = parse_frontmatter(text)
+
+    old = _old_split_sections(body)
+    new = _sections(body)
+
+    assert len(old) == len(new), f"{path.name} 切分数量不一致：{len(old)} vs {len(new)}"
+    for (old_title, old_body), (new_title, new_body) in zip(old, new):
+        assert old_title == new_title, f"{path.name} 小节名不一致"
+        assert old_body == new_body, f"{path.name} / {old_title} 正文不一致"
+
+
+def test_legacy_ids_unchanged():
+    """导入产出的 id 集合必须与旧实现相同，否则存量条目会被删重建。"""
+    docs = build_documents()
+    ids = {d["id"] for d in docs}
+
+    expected = set()
+    for path in sorted((__import__("pathlib").Path("data/faq")).glob("P-*.md")):
+        text = path.read_text(encoding="utf-8-sig")
+        meta, body = parse_frontmatter(text)
+        doc_id = meta.get("id") or path.stem
+        for i in range(len(_old_split_sections(body))):
+            expected.add(f"{doc_id}-{i + 1}")
+
+    assert ids == expected, f"多出 {ids - expected}，缺少 {expected - ids}"

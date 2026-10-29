@@ -23,41 +23,9 @@ import sys
 from pathlib import Path
 
 from app import store, vector_store
+from app.markdown_split import parse_frontmatter, split_markdown
 
 FAQ_DIR = Path("data/faq")
-
-FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
-SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
-
-
-def parse_frontmatter(text: str) -> tuple[dict, str]:
-    match = FRONTMATTER_RE.match(text)
-    if not match:
-        return {}, text
-
-    meta: dict[str, str] = {}
-    for line in match.group(1).splitlines():
-        if ":" in line:
-            key, _, value = line.partition(":")
-            meta[key.strip()] = value.strip()
-    return meta, text[match.end() :]
-
-
-def split_sections(body: str) -> list[tuple[str, str]]:
-    """按二级标题切分，返回 [(小节名, 正文), ...]。无小节时整篇作一节。"""
-    matches = list(SECTION_RE.finditer(body))
-    if not matches:
-        text = body.strip()
-        return [("全文", text)] if text else []
-
-    sections = []
-    for i, match in enumerate(matches):
-        start = match.end()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
-        content = body[start:end].strip()
-        if content:
-            sections.append((match.group(1).strip(), content))
-    return sections
 
 
 def build_documents() -> list[dict]:
@@ -75,7 +43,12 @@ def build_documents() -> list[dict]:
         title = meta.get("title") or path.stem
         category = meta.get("category") or "未分类"
 
-        for index, (section, content) in enumerate(split_sections(body)):
+        # legacy 模式：只认 ##、不切长、不合并，输出与旧的 split_sections
+        # 逐字一致。脚本的 id 是 {doc_id}-{序号}，切分结果一变就会导致
+        # 存量条目被删重建，所以这里必须保持历史行为。
+        sections = split_markdown(body, legacy=True).chunks
+
+        for index, chunk in enumerate(sections):
             docs.append(
                 {
                     "id": f"{doc_id}-{index + 1}",
@@ -83,8 +56,8 @@ def build_documents() -> list[dict]:
                     "title": title,
                     "category": category,
                     "version": meta.get("version", ""),
-                    "section": section,
-                    "content": content,
+                    "section": chunk.section,
+                    "content": chunk.content,
                     "source": path.name,
                 }
             )

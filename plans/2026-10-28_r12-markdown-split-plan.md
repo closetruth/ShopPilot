@@ -18,11 +18,11 @@
 
 ## 步骤 2：脚本兼容
 
-- [ ] `scripts/import_faq.py` 改为从 `app.markdown_split` 导入
-- [ ] 调用 `split_markdown(..., legacy=True)`
-- [ ] golden 测试：每个 `data/faq/*.md` 断言新旧 `(section, content)` 逐字相等
-- [ ] 验证：`uv run pytest tests/test_faq_import.py tests/test_scripts.py -q`
-- [ ] 提交
+- [x] `scripts/import_faq.py` 改为从 `app.markdown_split` 导入
+- [x] 调用 `split_markdown(..., legacy=True)`
+- [x] golden 测试：每个 `data/faq/*.md` 断言新旧 `(section, content)` 逐字相等
+- [x] 验证：`uv run pytest tests/test_faq_import.py tests/test_scripts.py -q`
+- [x] 提交
 
 ## 步骤 3：批量入库仓储
 
