@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from app.db import conn_params as _conn_params
 from app.db import init_db, now
-from app.repo import chats, commerce, knowledge
+from app.repo import chats, commerce, insights, knowledge
 
 __all__ = [
     "init_db",
@@ -97,3 +97,9 @@ faq_by_id = knowledge.by_id
 list_faq = knowledge.list_by_category
 faq_categories = knowledge.categories
 delete_stale_faq = knowledge.delete_missing
+
+# ---------- 低置信度 ----------
+
+record_low_confidence = insights.record
+list_low_confidence = insights.list_recent
+low_confidence_stats = insights.stats

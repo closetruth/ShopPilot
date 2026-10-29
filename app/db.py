@@ -44,6 +44,19 @@ CREATE TABLE IF NOT EXISTS products (
     KEY idx_products_category (category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS low_confidence_queries (
+    id           BIGINT        NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    visitor_id   VARCHAR(64)   NOT NULL,
+    query        TEXT          NOT NULL,
+    max_score    FLOAT         NULL,
+    result_count INT           NOT NULL DEFAULT 0,
+    reason       VARCHAR(32)   NOT NULL,
+    retrieved    VARCHAR(512)  NULL,
+    created_at   DATETIME(6)   NOT NULL,
+    KEY idx_low_conf_created (created_at),
+    KEY idx_low_conf_reason (reason)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS faq_documents (
     id          VARCHAR(64)   NOT NULL PRIMARY KEY,
     doc_id      VARCHAR(32)   NOT NULL,

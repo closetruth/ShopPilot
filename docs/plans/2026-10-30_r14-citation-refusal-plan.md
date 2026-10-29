@@ -4,11 +4,11 @@
 
 ## 步骤 1：低置信度表
 
-- [ ] `app/db.py` 建 `low_confidence_queries` 表
-- [ ] `app/repo/knowledge.py`（或新 `app/repo/insights.py`）加 `record_low_confidence()`
-- [ ] 加 `list_low_confidence(limit)` 查询
-- [ ] 验证：直接调用确认写入与查询
-- [ ] 提交
+- [x] `app/db.py` 建 `low_confidence_queries` 表
+- [x] `app/repo/knowledge.py`（或新 `app/repo/insights.py`）加 `record_low_confidence()`
+- [x] 加 `list_low_confidence(limit)` 查询
+- [x] 验证：直接调用确认写入与查询
+- [x] 提交
 
 ## 步骤 2：工具返回结构调整
 
