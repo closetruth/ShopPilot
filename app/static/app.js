@@ -76,6 +76,68 @@ function setText(bubble, text) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+/* ---------- 引用编号 ---------- */
+
+const CITE_RE = /\[(P-[A-Z]+-\d{3}(?:-\d+)?)\]/g;
+const citeCache = new Map();
+
+/**
+ * 把回答里的 [P-RET-001-3] 渲染成可悬停的元素。
+ *
+ * 流式过程中不处理——每来一个 chunk 就重排 DOM 会让光标抖动。
+ * 只在回答结束后调一次。
+ */
+function renderCitations(bubble, text) {
+  bubble.replaceChildren();
+  let last = 0;
+  let found = false;
+
+  for (const match of text.matchAll(CITE_RE)) {
+    found = true;
+    if (match.index > last) {
+      bubble.appendChild(document.createTextNode(text.slice(last, match.index)));
+    }
+    const id = match[1];
+    const span = document.createElement("span");
+    span.className = "cite";
+    span.dataset.citeId = id;
+    span.textContent = id;
+    span.title = "加载中…";
+    span.addEventListener("mouseenter", () => loadCite(span, id), { once: true });
+    bubble.appendChild(span);
+    last = match.index + match[0].length;
+  }
+
+  if (!found) {
+    bubble.textContent = text;
+    return;
+  }
+  if (last < text.length) {
+    bubble.appendChild(document.createTextNode(text.slice(last)));
+  }
+}
+
+async function loadCite(el, id) {
+  if (citeCache.has(id)) {
+    el.title = citeCache.get(id);
+    return;
+  }
+  try {
+    const res = await fetch("/api/faq/" + encodeURIComponent(id));
+    if (!res.ok) {
+      el.title = "未找到该条款";
+      citeCache.set(id, "未找到该条款");
+      return;
+    }
+    const d = await res.json();
+    const tip = `${d.title} / ${d.section}\n\n${d.content}`;
+    el.title = tip;
+    citeCache.set(id, tip);
+  } catch {
+    el.title = "条款加载失败";
+  }
+}
+
 function renderGreeting() {
   addRow("bot", "您好，我是店铺客服。请问有什么可以帮您？");
 }
@@ -654,7 +716,9 @@ async function loadHistory() {
       return;
     }
     for (const m of data.messages) {
-      addRow(m.role === "user" ? "me" : "bot", m.content);
+      const { bubble } = addRow(m.role === "user" ? "me" : "bot");
+      if (m.role === "user") bubble.textContent = m.content;
+      else renderCitations(bubble, m.content);
     }
   } catch {
     renderGreeting();
@@ -792,6 +856,7 @@ async function send(text) {
     bubble.classList.remove("streaming");
     toolHint.hidden = true;
     if (!acc && !failed) setText(bubble, "（无回复）");
+    else if (acc) renderCitations(bubble, acc);
     busy = false;
     sendEl.disabled = false;
     setStatus("在线");

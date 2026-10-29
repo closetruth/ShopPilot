@@ -672,3 +672,19 @@ html, body {
   .sidebar.open { transform: none; }
   .toggle { display: block; }
 }
+
+/* ---------- 政策引用 ---------- */
+
+.cite {
+  color: var(--user);
+  border-bottom: 1px dashed currentColor;
+  cursor: help;
+  font-size: .92em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0 1px;
+}
+
+.cite:hover {
+  background: rgba(47, 111, 235, .08);
+  border-bottom-style: solid;
+}

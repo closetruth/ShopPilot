@@ -28,18 +28,18 @@
 
 ## 步骤 4：引用悬停
 
-- [ ] `app/main.py` 加 `GET /api/faq/{faq_id}` 返回单条政策
-- [ ] `app/static/app.js` 渲染时正则识别编号，生成 `.cite` 元素
-- [ ] 悬停时按需查正文，`Map` 缓存
-- [ ] `app/static/style.css` 加虚线下划线样式
-- [ ] 验证：浏览器实测悬停显示正文
-- [ ] 提交
+- [x] `app/main.py` 加 `GET /api/faq/{faq_id}` 返回单条政策
+- [x] `app/static/app.js` 渲染时正则识别编号，生成 `.cite` 元素
+- [x] 悬停时按需查正文，`Map` 缓存
+- [x] `app/static/style.css` 加虚线下划线样式
+- [x] 验证：浏览器实测悬停显示正文
+- [x] 提交
 
 ## 步骤 5：低置信度查看接口
 
-- [ ] `GET /api/admin/low-confidence?limit=100`
-- [ ] 验证：curl 能取到步骤 2 写入的记录
-- [ ] 提交
+- [x] `GET /api/admin/low-confidence?limit=100`
+- [x] 验证：curl 能取到步骤 2 写入的记录
+- [x] 提交
 
 ## 步骤 6：验收
 

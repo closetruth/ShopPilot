@@ -187,6 +187,35 @@ async def admin_faq_categories() -> dict:
     return {"categories": store.faq_categories()}
 
 
+@app.get("/api/faq/{faq_id}")
+async def faq_detail(faq_id: str) -> dict:
+    """按 id 取单条政策全文，供对话页的引用悬停使用。
+
+    这是公开端点：政策本来就是给顾客看的，不需要管理员权限。
+    """
+    row = store.faq_by_id(faq_id)
+    if row is None or not row["enabled"]:
+        raise HTTPException(status_code=404, detail="知识不存在")
+    return {
+        "id": row["id"],
+        "doc_id": row["doc_id"],
+        "title": row["title"],
+        "category": row["category"],
+        "section": row["section"],
+        "content": row["content"],
+    }
+
+
+@app.get("/api/admin/low-confidence")
+async def admin_low_confidence(limit: int = 100) -> dict:
+    """低置信度问题清单，用来决定补什么知识。"""
+    limit = max(1, min(limit, 500))
+    return {
+        "items": store.list_low_confidence(limit),
+        "stats": store.low_confidence_stats(),
+    }
+
+
 @app.get("/api/admin/faq/search")
 async def admin_debug_search(q: str, top_k: int = 5) -> dict:
     """调试用：查看检索原始分数，绕过阈值过滤。
