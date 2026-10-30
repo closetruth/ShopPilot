@@ -1,0 +1,95 @@
+# Milvus 独立部署：SeaweedFS 替代 MinIO
+#
+# MinIO 社区版已于 2026-04 归档，Docker 镜像从官方仓库移除，拉不到。
+# SeaweedFS 是 S3 兼容的对象存储，Milvus 可以直接用它作为存储后端。
+#
+# 启动：docker compose -f milvus-compose.yml up -d
+# 停止：docker compose -f milvus-compose.yml down
+# 数据：三个命名卷，删容器不丢数据
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: shoppilot-etcd
+    restart: unless-stopped
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    command:
+      - etcd
+      - -advertise-client-urls=http://127.0.0.1:2379
+      - -listen-client-urls=http://0.0.0.0:2379
+      - --data-dir=/etcd
+    volumes:
+      - etcd-data:/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # SeaweedFS 全功能单进程：master + volume + filer + S3 网关
+  # 生产环境应拆成多个服务，这里单机演示够用
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: shoppilot-seaweedfs
+    restart: unless-stopped
+    command: >
+      server
+      -dir=/data
+      -s3
+      -s3.port=8333
+      -s3.config=/etc/seaweedfs/s3.json
+      -master.volumeSizeLimitMB=1024
+      -volume.max=10
+    volumes:
+      - seaweed-data:/data
+      - ./seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+    ports:
+      - "8333:8333"
+    healthcheck:
+      # 8333 是 S3 网关，未认证的根路径返回 403，wget 会当失败；
+      # 9333 是 master 的 HTTP 端口，/cluster/status 无需认证
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9333/cluster/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  milvus:
+    image: milvusdb/milvus:v2.5.4
+    container_name: shoppilot-milvus
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: seaweedfs:8333
+      MINIO_ACCESS_KEY_ID: shoppilot
+      MINIO_SECRET_ACCESS_KEY: shoppilot123
+      MINIO_BUCKET_NAME: shoppilot-milvus
+      # Milvus 的配置项沿用 MINIO_* 前缀，换成 S3 兼容存储时字段名不变
+      COMMON_STORAGETYPE: minio
+    volumes:
+      - milvus-data:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      etcd:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  etcd-data:
+  seaweed-data:
+  milvus-data:

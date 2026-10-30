@@ -26,6 +26,17 @@ _client: MilvusClient | None = None
 
 
 def milvus_uri() -> str:
+    """连接地址。
+
+    两种形态：
+    - http://host:19530  → 独立 Milvus 服务（推荐，多进程可并发访问）
+    - 本地路径如 data/milvus.db → Milvus Lite（进程内，单进程独占）
+
+    默认走本地 Lite，是为了让测试在无网络时也能跑；生产应配置远端。
+    """
+    uri = os.getenv("MILVUS_URI", "").strip()
+    if uri:
+        return uri
     return os.getenv("VECTOR_DB_PATH", DEFAULT_URI)
 
 
@@ -33,9 +44,10 @@ def get_client() -> MilvusClient:
     global _client
     if _client is None:
         uri = milvus_uri()
-        parent = os.path.dirname(uri)
-        if parent:
-            os.makedirs(parent, exist_ok=True)
+        if not uri.startswith("http"):
+            parent = os.path.dirname(uri)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
         _client = MilvusClient(uri)
         _ensure_collection(_client)
     return _client
