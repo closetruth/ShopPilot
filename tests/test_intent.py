@@ -60,6 +60,33 @@ async def test_llm_low_confidence_falls_to_business():
     assert result.intent == "business" and result.method == "fallback"
 
 
+class FakeLLMThrows:
+    """mock 的 llm 对象：ainvoke 始终抛异常。"""
+    async def ainvoke(self, messages):
+        raise RuntimeError("网络断了")
+
+
+@pytest.mark.anyio
+async def test_llm_throws_falls_to_business():
+    """LLM 调用本身失败时降级为 business（Critical：此前无异常保护）。"""
+    result = await classify_intent("帮我查一下", FakeLLMThrows())
+    assert result.intent == "business"
+    assert result.confidence == 0.0
+    assert result.method == "fallback"
+
+
+@pytest.mark.anyio
+async def test_unparseable_logs_warning(caplog):
+    """解析失败时记 warning（不是 info）——线上要能一眼看出。"""
+    import logging
+    caplog.set_level(logging.WARNING)
+    await classify_intent("???", FakeLLM("纯乱码"))
+    assert any(
+        r.levelno == logging.WARNING and "无法解析" in r.getMessage()
+        for r in caplog.records
+    )
+
+
 @pytest.mark.anyio
 async def test_rule_hit_skips_llm():
     """反目标「规则能定的不调模型」：规则命中时 llm 不应被调用。"""

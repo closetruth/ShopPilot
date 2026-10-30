@@ -95,15 +95,24 @@ async def classify_intent(message: str, llm) -> IntentResult:
     if confident:
         return IntentResult(intent=intent, confidence=1.0, method="rule")
 
-    raw = await _ask_llm(message, llm)
+    try:
+        raw = await _ask_llm(message, llm)
+    except Exception as exc:  # noqa: BLE001 - 网络/模型故障降级为业务，不断对话
+        logger.warning("意图分类 LLM 调用失败：%s", exc)
+        return IntentResult(intent="business", confidence=0.0, method="fallback")
+
     parsed = _parse_llm_json(raw)
     if parsed is not None and parsed["confidence"] >= _CONFIDENCE_THRESHOLD:
         return IntentResult(
             intent=parsed["intent"], confidence=parsed["confidence"], method="llm"
         )
 
-    reason = "置信度过低" if parsed is not None else "返回无法解析"
-    logger.info("意图 LLM 兜底命中 business：%s（原始返回：%s）", reason, raw[:100])
+    if parsed is None:
+        logger.warning("意图 LLM 返回无法解析：%s", raw[:120])
+        reason = "返回无法解析"
+    else:
+        logger.info("意图 LLM 置信度过低：%s < %.2f", parsed["confidence"], _CONFIDENCE_THRESHOLD)
+        reason = "置信度过低"
     return IntentResult(intent="business", confidence=0.0, method="fallback")
 
 
