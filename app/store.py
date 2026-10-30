@@ -47,6 +47,10 @@ __all__ = [
     "all_faq_for_index",
     "faq_by_id",
     "list_faq",
+    # 轨迹
+    "record_trace",
+    "list_traces",
+    "trace_stats",
 ]
 
 
@@ -103,3 +107,9 @@ delete_stale_faq = knowledge.delete_missing
 record_low_confidence = insights.record
 list_low_confidence = insights.list_recent
 low_confidence_stats = insights.stats
+
+# ---------- agent 轨迹 ----------
+
+record_trace = insights.record_trace
+list_traces = insights.list_traces
+trace_stats = insights.trace_stats

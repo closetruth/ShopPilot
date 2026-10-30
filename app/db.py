@@ -112,6 +112,27 @@ CREATE TABLE IF NOT EXISTS work_orders (
     KEY idx_orders_visitor_order (visitor_id, order_no),
     KEY idx_orders_dedupe (visitor_id, order_no, issue_type, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS agent_traces (
+    id              BIGINT        NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    conversation_id VARCHAR(32)   NOT NULL,
+    visitor_id      VARCHAR(64)   NOT NULL,
+    message         TEXT          NOT NULL,
+    resolved_query  TEXT          NULL,
+    intent          VARCHAR(32)   NOT NULL,
+    intent_method   VARCHAR(16)   NOT NULL,
+    confidence      FLOAT         NULL,
+    node_path       VARCHAR(256)  NOT NULL,
+    top_score       FLOAT         NULL,
+    tool_calls      VARCHAR(256)  NULL,
+    steps           INT           NULL,
+    total_tokens    INT           NULL,
+    latency_ms      INT           NOT NULL,
+    detail          JSON          NULL,
+    created_at      DATETIME(6)   NOT NULL,
+    KEY idx_traces_conv (conversation_id),
+    KEY idx_traces_intent (intent)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """
 
 
