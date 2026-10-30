@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "shoppilot",
+      "credentials": [
+        {
+          "accessKey": "shoppilot",
+          "secretKey": "shoppilot123"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

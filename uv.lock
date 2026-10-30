@@ -376,6 +376,12 @@ wheels = [
 ]
 
 [[package]]
+name = "jieba"
+version = "0.42.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/cb/18eeb235f833b726522d7ebed54f2278ce28ba9438e3135ab0278d9792a2/jieba-0.42.1.tar.gz", hash = "sha256:055ca12f62674fafed09427f176506079bc135638a14e23e25be909131928db2", size = 19214172, upload-time = "2020-01-20T14:27:23.5Z" }
+
+[[package]]
 name = "jiter"
 version = "0.18.0"
 source = { registry = "https://pypi.org/simple" }
@@ -864,6 +870,18 @@ wheels = [
 ]
 
 [[package]]
+name = "rank-bm25"
+version = "0.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fc/0a/f9579384aa017d8b4c15613f86954b92a95a93d641cc849182467cf0bb3b/rank_bm25-0.2.2.tar.gz", hash = "sha256:096ccef76f8188563419aaf384a02f0ea459503fdf77901378d4fd9d87e5e51d", size = 8347, upload-time = "2022-02-16T12:10:52.196Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/21/f691fb2613100a62b3fa91e9988c991e9ca5b89ea31c0d3152a3210344f9/rank_bm25-0.2.2-py3-none-any.whl", hash = "sha256:7bd4a95571adadfc271746fa146a4bcfd89c0cf731e49c3d1ad863290adbe8ae", size = 8584, upload-time = "2022-02-16T12:10:50.626Z" },
+]
+
+[[package]]
 name = "regex"
 version = "2026.9.29"
 source = { registry = "https://pypi.org/simple" }
@@ -921,12 +939,14 @@ source = { virtual = "." }
 dependencies = [
     { name = "cryptography" },
     { name = "fastapi" },
+    { name = "jieba" },
     { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "milvus-lite" },
     { name = "pymilvus", extra = ["milvus-lite"] },
     { name = "pymysql" },
     { name = "python-dotenv" },
+    { name = "rank-bm25" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -940,12 +960,14 @@ dev = [
 requires-dist = [
     { name = "cryptography", specifier = ">=50.0.2" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "jieba", specifier = ">=0.42.1" },
     { name = "langchain-openai", specifier = ">=0.3" },
     { name = "langgraph", specifier = ">=1.2.18" },
     { name = "milvus-lite", specifier = ">=3.2.2" },
     { name = "pymilvus", extras = ["milvus-lite"], specifier = ">=3.0.2" },
     { name = "pymysql", specifier = ">=1.2.3" },
     { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "rank-bm25", specifier = ">=0.2.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
