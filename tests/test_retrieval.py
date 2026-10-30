@@ -70,7 +70,6 @@ def _search(query: str, top_k: int = 3) -> list[dict]:
         ("买完就降价了能补差价吗", "P-PRI-001"),
         ("只退款不退货可以吗", "P-REF-001"),
         ("会员有什么权益", "P-MEM-001"),
-        ("要投诉你们的服务", "P-COM-001"),
     ],
 )
 def test_search_finds_the_right_policy(indexed_faq, question, expected_doc):
@@ -81,6 +80,22 @@ def test_search_finds_the_right_policy(indexed_faq, question, expected_doc):
     doc_ids = [r["doc_id"] for r in results]
     assert expected_doc in doc_ids, (
         f"「{question}」期望命中 {expected_doc}，实际命中 {doc_ids}"
+    )
+
+
+def test_borderline_complaint_is_rejected(indexed_faq):
+    """「要投诉你们的服务」得分 0.63，落在检索阈值与拒答阈值之间。
+
+    r14 把证据充分性阈值升到 0.65 后，这条被判定为证据不足而拒答。
+    这是可接受的取舍：投诉本来就该转人工而非引用条款；但要在测试里
+    明确固化这个行为，防止将来调阈值时无意识地来回变化。
+
+    它同时暴露了阈值方法本身的局限——0.63（投诉）与 0.657（买一送一）
+    之间没有可靠的分界线，详见 docs/dev-notes/r14.md 的遗留问题。
+    """
+    results = _search("要投诉你们的服务")
+    assert results == [], (
+        f"阈值 0.65 下「要投诉」应被拒答，实际返回 {[r['title'] for r in results]}"
     )
 
 
