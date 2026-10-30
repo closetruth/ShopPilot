@@ -15,6 +15,8 @@ dependencies = [
     "milvus-lite>=3.2.2",
     "jieba>=0.42.1",
     "rank-bm25>=0.2.2",
+    "langgraph-checkpoint-mysql>=3.0.0",
+    "langgraph-checkpoint-sqlite>=3.1.2",
 ]
 
 [dependency-groups]
