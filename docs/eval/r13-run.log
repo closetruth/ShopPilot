@@ -1,0 +1,25 @@
+C:\Users\Adventure\VscodeSpace\ShopPilot\.venv\Lib\site-packages\jieba\__init__.py:44: SyntaxWarning: invalid escape sequence '\.'
+  re_han_default = re.compile("([\u4E00-\u9FD5a-zA-Z0-9+#&\._%\-]+)", re.U)
+C:\Users\Adventure\VscodeSpace\ShopPilot\.venv\Lib\site-packages\jieba\__init__.py:46: SyntaxWarning: invalid escape sequence '\s'
+  re_skip_default = re.compile("(\r\n|\s)", re.U)
+C:\Users\Adventure\VscodeSpace\ShopPilot\.venv\Lib\site-packages\jieba\finalseg\__init__.py:78: SyntaxWarning: invalid escape sequence '\.'
+  re_skip = re.compile("([a-zA-Z0-9]+(?:\.\d+)?%?)")
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\ADVENT~1\AppData\Local\Temp\jieba.cache
+Loading model cost 0.692 seconds.
+Prefix dict has been built successfully.
+评估样本 473 条
+
+跑 vector …
+  R@1 0.442  R@3 0.702  R@10 0.780  MRR@10 0.577  P50 359ms
+
+跑 bm25 …
+  R@1 0.110  R@3 0.279  R@10 0.480  MRR@10 0.219  P50 107ms
+
+跑 hybrid …
+  R@1 0.313  R@3 0.476  R@10 0.662  MRR@10 0.413  P50 1476ms
+
+跑 hybrid_rerank …
+  R@1 0.423  R@3 0.689  R@10 0.905  MRR@10 0.576  P50 2147ms
+
+结果已写入 docs\eval\r13-results.json

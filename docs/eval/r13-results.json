@@ -1,152 +1,332 @@
 {
-  "n": 20,
+  "n": 473,
   "results": {
     "vector": {
       "strategy": "vector",
-      "n": 20,
+      "n": 473,
       "recall": {
-        "@1": 0.5,
-        "@3": 0.6,
-        "@5": 0.65,
-        "@10": 0.75
+        "@1": 0.4419,
+        "@3": 0.7019,
+        "@5": 0.7505,
+        "@10": 0.7801
       },
       "all_hit": {
-        "@1": 0.75,
-        "@3": 0.75,
-        "@5": 0.75,
-        "@10": 0.75
+        "@1": 0.7082,
+        "@3": 0.7082,
+        "@5": 0.7082,
+        "@10": 0.7082
       },
-      "mrr@10": 0.5755,
+      "mrr@10": 0.5774,
       "latency_ms": {
-        "p50": 233.5,
-        "p95": 292.3,
-        "mean": 294.3
+        "p50": 359.4,
+        "p95": 520.1,
+        "mean": 362.0
       }
     },
     "bm25": {
       "strategy": "bm25",
-      "n": 20,
+      "n": 473,
       "recall": {
-        "@1": 0.1,
-        "@3": 0.2,
-        "@5": 0.25,
-        "@10": 0.35
+        "@1": 0.1099,
+        "@3": 0.2791,
+        "@5": 0.3869,
+        "@10": 0.4799
       },
       "all_hit": {
-        "@1": 0.35,
-        "@3": 0.35,
-        "@5": 0.35,
-        "@10": 0.35
+        "@1": 0.3975,
+        "@3": 0.3975,
+        "@5": 0.3975,
+        "@10": 0.3975
       },
-      "mrr@10": 0.1576,
+      "mrr@10": 0.2187,
       "latency_ms": {
-        "p50": 113.0,
-        "p95": 138.9,
-        "mean": 115.8
+        "p50": 106.6,
+        "p95": 138.8,
+        "mean": 109.8
       }
     },
     "hybrid": {
       "strategy": "hybrid",
-      "n": 20,
+      "n": 473,
       "recall": {
-        "@1": 0.4,
-        "@3": 0.6,
-        "@5": 0.7,
-        "@10": 0.8
+        "@1": 0.3129,
+        "@3": 0.4757,
+        "@5": 0.5603,
+        "@10": 0.6617
       },
       "all_hit": {
-        "@1": 0.8,
-        "@3": 0.8,
-        "@5": 0.8,
-        "@10": 0.8
+        "@1": 0.5877,
+        "@3": 0.5877,
+        "@5": 0.5877,
+        "@10": 0.5877
       },
-      "mrr@10": 0.5238,
+      "mrr@10": 0.4129,
       "latency_ms": {
-        "p50": 1343.0,
-        "p95": 1430.6,
-        "mean": 1351.8
+        "p50": 1475.5,
+        "p95": 2090.8,
+        "mean": 1575.6
       }
     },
     "hybrid_rerank": {
       "strategy": "hybrid_rerank",
-      "n": 20,
+      "n": 473,
       "recall": {
-        "@1": 0.6,
-        "@3": 0.75,
-        "@5": 0.8,
-        "@10": 0.9
+        "@1": 0.4228,
+        "@3": 0.6892,
+        "@5": 0.7907,
+        "@10": 0.9049
       },
       "all_hit": {
-        "@1": 0.9,
-        "@3": 0.9,
-        "@5": 0.9,
-        "@10": 0.9
+        "@1": 0.8478,
+        "@3": 0.8478,
+        "@5": 0.8478,
+        "@10": 0.8478
       },
-      "mrr@10": 0.6817,
+      "mrr@10": 0.5756,
       "latency_ms": {
-        "p50": 2073.1,
-        "p95": 2339.2,
-        "mean": 2129.7
+        "p50": 2146.8,
+        "p95": 2527.6,
+        "mean": 2194.0
       }
     }
   },
   "by_bucket": {
     "vector": {
       "colloquial": {
-        "n": 20,
-        "recall@3": 0.6,
-        "mrr@10": 0.5755
+        "n": 145,
+        "recall@3": 0.5724,
+        "mrr@10": 0.4765
+      },
+      "numeric": {
+        "n": 8,
+        "recall@3": 0.375,
+        "mrr@10": 0.3929
+      },
+      "paraphrase": {
+        "n": 174,
+        "recall@3": 0.7356,
+        "mrr@10": 0.5616
+      },
+      "verbatim": {
+        "n": 146,
+        "recall@3": 0.8082,
+        "mrr@10": 0.7066
       }
     },
     "bm25": {
       "colloquial": {
-        "n": 20,
-        "recall@3": 0.2,
-        "mrr@10": 0.1576
+        "n": 145,
+        "recall@3": 0.1448,
+        "mrr@10": 0.1223
+      },
+      "numeric": {
+        "n": 8,
+        "recall@3": 0.625,
+        "mrr@10": 0.3472
+      },
+      "paraphrase": {
+        "n": 174,
+        "recall@3": 0.2759,
+        "mrr@10": 0.2274
+      },
+      "verbatim": {
+        "n": 146,
+        "recall@3": 0.3973,
+        "mrr@10": 0.297
       }
     },
     "hybrid": {
       "colloquial": {
-        "n": 20,
-        "recall@3": 0.6,
-        "mrr@10": 0.5238
+        "n": 145,
+        "recall@3": 0.3103,
+        "mrr@10": 0.2792
+      },
+      "numeric": {
+        "n": 8,
+        "recall@3": 0.625,
+        "mrr@10": 0.6771
+      },
+      "paraphrase": {
+        "n": 174,
+        "recall@3": 0.4195,
+        "mrr@10": 0.3591
+      },
+      "verbatim": {
+        "n": 146,
+        "recall@3": 0.6986,
+        "mrr@10": 0.5952
       }
     },
     "hybrid_rerank": {
       "colloquial": {
-        "n": 20,
-        "recall@3": 0.75,
-        "mrr@10": 0.6817
+        "n": 145,
+        "recall@3": 0.6483,
+        "mrr@10": 0.5419
+      },
+      "numeric": {
+        "n": 8,
+        "recall@3": 0.875,
+        "mrr@10": 0.7542
+      },
+      "paraphrase": {
+        "n": 174,
+        "recall@3": 0.6667,
+        "mrr@10": 0.5706
+      },
+      "verbatim": {
+        "n": 146,
+        "recall@3": 0.7466,
+        "mrr@10": 0.6054
       }
     }
   },
   "by_family": {
     "vector": {
       "售后": {
+        "n": 60,
+        "recall@3": 0.6667,
+        "mrr@10": 0.6006
+      },
+      "投诉": {
+        "n": 74,
+        "recall@3": 0.6351,
+        "mrr@10": 0.4986
+      },
+      "物流": {
+        "n": 101,
+        "recall@3": 0.802,
+        "mrr@10": 0.6647
+      },
+      "补偿": {
+        "n": 71,
+        "recall@3": 0.7324,
+        "mrr@10": 0.6256
+      },
+      "质量问题": {
+        "n": 63,
+        "recall@3": 0.6825,
+        "mrr@10": 0.5966
+      },
+      "退换货": {
+        "n": 84,
+        "recall@3": 0.6786,
+        "mrr@10": 0.5279
+      },
+      "退款": {
         "n": 20,
         "recall@3": 0.6,
-        "mrr@10": 0.5755
+        "mrr@10": 0.3358
       }
     },
     "bm25": {
       "售后": {
+        "n": 60,
+        "recall@3": 0.2667,
+        "mrr@10": 0.2008
+      },
+      "投诉": {
+        "n": 74,
+        "recall@3": 0.3378,
+        "mrr@10": 0.2291
+      },
+      "物流": {
+        "n": 101,
+        "recall@3": 0.2475,
+        "mrr@10": 0.1836
+      },
+      "补偿": {
+        "n": 71,
+        "recall@3": 0.2817,
+        "mrr@10": 0.2203
+      },
+      "质量问题": {
+        "n": 63,
+        "recall@3": 0.1905,
+        "mrr@10": 0.1659
+      },
+      "退换货": {
+        "n": 84,
+        "recall@3": 0.3929,
+        "mrr@10": 0.3342
+      },
+      "退款": {
         "n": 20,
-        "recall@3": 0.2,
-        "mrr@10": 0.1576
+        "recall@3": 0.05,
+        "mrr@10": 0.0871
       }
     },
     "hybrid": {
       "售后": {
+        "n": 60,
+        "recall@3": 0.7,
+        "mrr@10": 0.5784
+      },
+      "投诉": {
+        "n": 74,
+        "recall@3": 0.5,
+        "mrr@10": 0.4409
+      },
+      "物流": {
+        "n": 101,
+        "recall@3": 0.3663,
+        "mrr@10": 0.3209
+      },
+      "补偿": {
+        "n": 71,
+        "recall@3": 0.3944,
+        "mrr@10": 0.3568
+      },
+      "质量问题": {
+        "n": 63,
+        "recall@3": 0.4444,
+        "mrr@10": 0.3623
+      },
+      "退换货": {
+        "n": 84,
+        "recall@3": 0.5119,
+        "mrr@10": 0.4968
+      },
+      "退款": {
         "n": 20,
-        "recall@3": 0.6,
-        "mrr@10": 0.5238
+        "recall@3": 0.5,
+        "mrr@10": 0.2826
       }
     },
     "hybrid_rerank": {
       "售后": {
+        "n": 60,
+        "recall@3": 0.7,
+        "mrr@10": 0.6278
+      },
+      "投诉": {
+        "n": 74,
+        "recall@3": 0.527,
+        "mrr@10": 0.4228
+      },
+      "物流": {
+        "n": 101,
+        "recall@3": 0.9406,
+        "mrr@10": 0.7583
+      },
+      "补偿": {
+        "n": 71,
+        "recall@3": 0.7183,
+        "mrr@10": 0.6089
+      },
+      "质量问题": {
+        "n": 63,
+        "recall@3": 0.6032,
+        "mrr@10": 0.543
+      },
+      "退换货": {
+        "n": 84,
+        "recall@3": 0.5833,
+        "mrr@10": 0.4418
+      },
+      "退款": {
         "n": 20,
-        "recall@3": 0.75,
-        "mrr@10": 0.6817
+        "recall@3": 0.6,
+        "mrr@10": 0.6092
       }
     }
   },
@@ -207,6 +387,210 @@
         "query": "用了之后皮肤过敏怎么办？",
         "bucket": "colloquial",
         "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这个活动商品能退吗？",
+        "bucket": "colloquial",
+        "family": "售后",
+        "expected": [
+          "P-RET-001-1"
+        ],
+        "got": [
+          "P-MEM-001-2",
+          "P-RET-002-3",
+          "P-RET-001-4",
+          "P-REF-001-3",
+          "P-MEM-001-1",
+          "P-RET-002-1",
+          "P-RET-001-3",
+          "P-PRI-001-1",
+          "P-REF-003-1",
+          "P-PRI-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这件衣服有点开线",
+        "bucket": "colloquial",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "鞋子尺码不对能换吗",
+        "bucket": "colloquial",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-4"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "鞋子38码大了怎么办",
+        "bucket": "numeric",
+        "family": "售后",
+        "expected": [
+          "P-RET-001-1"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "之前买的手机有杂音怎么办",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "收到的尺码不对怎么办？",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-LOG-001-1"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这个手机有质量问题吗？",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-REF-002-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这个杯子有裂痕，还能修吗",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-4"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这个洗面奶用后皮肤有点干",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这款手机有质量问题吗？",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-REF-002-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这款手机有质量问题吗？",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-REF-002-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这款手机经常卡顿怎么办",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "为什么我的东西这么差？我生气了",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们发错货了，跟网上展示的根本不一样。",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-LOG-001-1",
+          "P-LOG-001-5"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们的产品质量太差了，我不会再支持。",
+        "bucket": "colloquial",
+        "family": "投诉",
         "expected": [
           "P-REF-002-1"
         ],
@@ -475,6 +859,136 @@
         "first_rank": null,
         "hit_count": 0,
         "expected_count": 1
+      },
+      {
+        "query": "这个产品保修多久？",
+        "bucket": "colloquial",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这个商品有问题能换吗",
+        "bucket": "colloquial",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-4"
+        ],
+        "got": [
+          "P-PRI-001-4",
+          "P-LOG-002-4",
+          "P-REF-002-2",
+          "P-COM-001-3",
+          "P-RET-002-4",
+          "P-RET-002-1",
+          "P-RET-001-2",
+          "P-RET-001-1",
+          "P-RET-002-2",
+          "P-PRI-001-1"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这件衣服有点开线",
+        "bucket": "colloquial",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-INV-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这款商品有保修吗",
+        "bucket": "colloquial",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-PRI-001-4",
+          "P-LOG-002-4",
+          "P-RET-002-4",
+          "P-RET-002-1",
+          "P-RET-001-2",
+          "P-RET-001-1",
+          "P-RET-002-2",
+          "P-PRI-001-1",
+          "P-RET-002-3",
+          "P-RET-001-5"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "鞋子38码大了怎么办",
+        "bucket": "numeric",
+        "family": "售后",
+        "expected": [
+          "P-RET-001-1"
+        ],
+        "got": [],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "之前买的手机有杂音怎么办",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-PRI-001-4",
+          "P-LOG-002-4",
+          "P-REF-002-2",
+          "P-RET-002-2",
+          "P-RET-002-1",
+          "P-RET-001-2",
+          "P-REF-002-3",
+          "P-RET-001-3",
+          "P-PRI-001-2",
+          "P-COM-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "收到的尺码不对怎么办？",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-002-4",
+          "P-RET-001-5",
+          "P-LOG-001-4",
+          "P-REF-001-4",
+          "P-REF-001-2",
+          "P-REF-001-3",
+          "P-REF-001-1",
+          "P-RET-002-1",
+          "P-RET-001-2",
+          "P-REF-002-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
       }
     ],
     "hybrid": [
@@ -490,12 +1004,12 @@
           "P-RET-001-2",
           "P-RET-001-5",
           "P-REF-001-1",
-          "P-REF-001-2",
           "P-LOG-001-5",
+          "P-REF-001-2",
           "P-REF-002-3",
+          "P-REF-002-2",
           "P-REF-001-4",
-          "P-REF-001-3",
-          "P-REF-002-2"
+          "P-REF-001-3"
         ],
         "first_rank": null,
         "hit_count": 0,
@@ -517,8 +1031,8 @@
           "P-LOG-001-5",
           "P-REF-001-2",
           "P-PRI-001-2",
-          "P-REF-002-4",
-          "P-REF-002-3"
+          "P-RET-001-3",
+          "P-REF-002-4"
         ],
         "first_rank": null,
         "hit_count": 0,
@@ -534,14 +1048,14 @@
         "got": [
           "P-LOG-001-4",
           "P-REF-001-4",
-          "P-RET-001-5",
           "P-REF-001-3",
+          "P-RET-001-5",
           "P-RET-001-2",
           "P-REF-001-1",
           "P-LOG-001-5",
-          "P-REF-001-2",
+          "P-REF-002-3",
           "P-REF-002-2",
-          "P-REF-002-3"
+          "P-REF-001-2"
         ],
         "first_rank": null,
         "hit_count": 0,
@@ -569,6 +1083,376 @@
         "first_rank": null,
         "hit_count": 0,
         "expected_count": 1
+      },
+      {
+        "query": "这件衣服有点开线",
+        "bucket": "colloquial",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-INV-001-3",
+          "P-LOG-001-5",
+          "P-RET-001-3",
+          "P-INV-001-4",
+          "P-RET-002-2",
+          "P-REF-001-1",
+          "P-RET-001-2",
+          "P-INV-001-1",
+          "P-REF-002-2",
+          "P-REF-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "鞋子38码大了怎么办",
+        "bucket": "numeric",
+        "family": "售后",
+        "expected": [
+          "P-RET-001-1"
+        ],
+        "got": [
+          "P-REF-002-4",
+          "P-REF-002-5",
+          "P-REF-003-3",
+          "P-REF-002-1",
+          "P-REF-003-4",
+          "P-LOG-001-1",
+          "P-REF-001-3",
+          "P-REF-002-2",
+          "P-LOG-001-5",
+          "P-INV-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "之前买的手机有杂音怎么办",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-REF-002-2",
+          "P-COM-001-4",
+          "P-REF-002-4",
+          "P-RET-002-2",
+          "P-PRI-001-4",
+          "P-RET-001-2",
+          "P-COM-001-3",
+          "P-LOG-001-4",
+          "P-LOG-001-5",
+          "P-RET-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "收到的尺码不对怎么办？",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-REF-001-3",
+          "P-LOG-001-5",
+          "P-REF-001-1",
+          "P-REF-001-2",
+          "P-RET-001-5",
+          "P-RET-001-3",
+          "P-LOG-002-4",
+          "P-REF-002-3",
+          "P-PRI-001-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这款手机经常卡顿怎么办",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-REF-002-2",
+          "P-RET-002-2",
+          "P-COM-001-2",
+          "P-LOG-001-2",
+          "P-LOG-001-1",
+          "P-COM-001-1",
+          "P-COM-001-4",
+          "P-LOG-001-3",
+          "P-LOG-001-5",
+          "P-MEM-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "为什么我的东西这么差？我生气了",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-RET-001-2",
+          "P-REF-002-2",
+          "P-REF-002-4",
+          "P-RET-002-1",
+          "P-LOG-001-5",
+          "P-REF-002-3",
+          "P-RET-001-3",
+          "P-LOG-001-4",
+          "P-RET-002-2",
+          "P-MEM-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们发错了东西，我要求处理！",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-LOG-001-3",
+          "P-COM-001-3",
+          "P-REF-002-2",
+          "P-LOG-001-5",
+          "P-LOG-001-1",
+          "P-REF-001-4",
+          "P-REF-002-4",
+          "P-COM-001-4",
+          "P-MEM-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们发错货了，跟网上展示的根本不一样。",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-1",
+          "P-REF-002-3",
+          "P-REF-001-1",
+          "P-RET-001-5",
+          "P-REF-001-2",
+          "P-LOG-001-5",
+          "P-RET-001-3",
+          "P-LOG-001-4",
+          "P-REF-001-4",
+          "P-PRI-001-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们的产品质量太差了，我不会再支持。",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-RET-002-2",
+          "P-REF-002-5",
+          "P-COM-001-4",
+          "P-RET-001-3",
+          "P-REF-002-4",
+          "P-MEM-001-3",
+          "P-REF-001-2",
+          "P-REF-002-3",
+          "P-RET-002-1",
+          "P-REF-002-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们的服务太差了，东西都破了还不处理。",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1",
+          "P-COM-001-1"
+        ],
+        "got": [
+          "P-MEM-001-3",
+          "P-LOG-001-4",
+          "P-LOG-001-3",
+          "P-LOG-001-5",
+          "P-REF-002-2",
+          "P-LOG-001-2",
+          "P-MEM-001-2",
+          "P-COM-001-4",
+          "P-LOG-001-1",
+          "P-REF-002-4"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 2
+      },
+      {
+        "query": "我收到的商品是假货！这完全欺骗了我。",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-REF-001-2",
+          "P-LOG-001-5",
+          "P-REF-001-1",
+          "P-REF-002-4",
+          "P-REF-002-3",
+          "P-REF-001-3",
+          "P-REF-002-2",
+          "P-RET-001-2",
+          "P-RET-001-5"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "收到的商品都破了，这快递也太不负责了吧！",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-REF-001-2",
+          "P-REF-002-3",
+          "P-LOG-001-5",
+          "P-REF-001-4",
+          "P-RET-001-3",
+          "P-REF-002-4",
+          "P-REF-001-3",
+          "P-REF-001-1",
+          "P-RET-001-5"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们之前说会处理我的问题，到现在还没给我答复。",
+        "bucket": "paraphrase",
+        "family": "投诉",
+        "expected": [
+          "P-COM-001-1"
+        ],
+        "got": [
+          "P-COM-001-4",
+          "P-LOG-001-4",
+          "P-LOG-001-5",
+          "P-MEM-001-3",
+          "P-LOG-001-3",
+          "P-COM-001-3",
+          "P-LOG-002-4",
+          "P-REF-003-2",
+          "P-LOG-001-2",
+          "P-REF-003-1"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们之前说帮我处理退货，到现在还没动静，这是怎么回事？",
+        "bucket": "paraphrase",
+        "family": "投诉",
+        "expected": [
+          "P-COM-001-1",
+          "P-RET-001-1"
+        ],
+        "got": [
+          "P-LOG-001-5",
+          "P-MEM-001-3",
+          "P-LOG-001-3",
+          "P-MEM-001-2",
+          "P-REF-003-2",
+          "P-REF-001-1",
+          "P-REF-003-1",
+          "P-LOG-001-4",
+          "P-REF-001-2",
+          "P-LOG-002-4"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 2
+      },
+      {
+        "query": "你们发的货怎么这么慢？",
+        "bucket": "paraphrase",
+        "family": "投诉",
+        "expected": [
+          "P-LOG-001-1"
+        ],
+        "got": [
+          "P-REF-001-4",
+          "P-REF-001-1",
+          "P-REF-001-2",
+          "P-LOG-001-5",
+          "P-LOG-001-4",
+          "P-RET-001-5",
+          "P-RET-001-3",
+          "P-REF-001-3",
+          "P-MEM-001-2",
+          "P-COM-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们发的货有问题，这是次品吗？！",
+        "bucket": "paraphrase",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-REF-002-2",
+          "P-REF-002-3",
+          "P-RET-001-2",
+          "P-REF-002-4",
+          "P-LOG-001-5",
+          "P-RET-001-3",
+          "P-MEM-001-3",
+          "P-LOG-001-4",
+          "P-MEM-001-2",
+          "P-RET-002-1"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
       }
     ],
     "hybrid_rerank": [
@@ -587,8 +1471,8 @@
           "P-REF-002-3",
           "P-LOG-001-1",
           "P-REF-002-5",
-          "P-RET-002-3",
           "P-RET-002-4",
+          "P-RET-002-3",
           "P-LOG-001-4"
         ],
         "first_rank": null,
@@ -613,6 +1497,424 @@
           "P-LOG-001-4",
           "P-REF-002-4",
           "P-RET-002-4"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这件衣服有点开线",
+        "bucket": "colloquial",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-PRI-001-4",
+          "P-REF-002-5",
+          "P-REF-001-3",
+          "P-REF-002-2",
+          "P-RET-002-3",
+          "P-PRI-001-2",
+          "P-RET-002-2",
+          "P-RET-001-2",
+          "P-REF-002-4",
+          "P-REF-002-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "这个洗面奶用后皮肤有点干",
+        "bucket": "paraphrase",
+        "family": "售后",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-RET-002-2",
+          "P-MEM-001-3",
+          "P-RET-001-2",
+          "P-REF-002-5",
+          "P-REF-002-4",
+          "P-MEM-001-1",
+          "P-REF-002-2",
+          "P-RET-002-3",
+          "P-REF-003-4",
+          "P-COM-001-4"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "东西都烂了，快递怎么回事？",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-LOG-001-2",
+          "P-LOG-001-1",
+          "P-LOG-001-3",
+          "P-REF-002-5",
+          "P-REF-002-3",
+          "P-LOG-001-5",
+          "P-MEM-001-3",
+          "P-REF-002-4",
+          "P-LOG-002-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "为什么我的东西这么差？我生气了",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-REF-002-5",
+          "P-MEM-001-3",
+          "P-REF-002-3",
+          "P-REF-002-2",
+          "P-COM-001-4",
+          "P-RET-002-3",
+          "P-LOG-001-4",
+          "P-RET-002-2",
+          "P-REF-002-4",
+          "P-PRI-001-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们发错了东西，我要求处理！",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-LOG-001-2",
+          "P-LOG-001-3",
+          "P-LOG-001-5",
+          "P-LOG-001-1",
+          "P-MEM-001-3",
+          "P-REF-002-5",
+          "P-REF-002-3",
+          "P-REF-001-2",
+          "P-INV-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们发错货了，跟网上展示的根本不一样。",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-REF-002-3",
+          "P-PRI-001-2",
+          "P-MEM-001-3",
+          "P-REF-002-5",
+          "P-LOG-001-4",
+          "P-REF-002-2",
+          "P-REF-002-4",
+          "P-LOG-001-1",
+          "P-LOG-001-3",
+          "P-REF-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们的服务太差了，东西都破了还不处理。",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1",
+          "P-COM-001-1"
+        ],
+        "got": [
+          "P-MEM-001-3",
+          "P-LOG-001-2",
+          "P-LOG-001-3",
+          "P-LOG-001-1",
+          "P-LOG-001-4",
+          "P-REF-002-5",
+          "P-LOG-001-5",
+          "P-REF-002-4",
+          "P-COM-001-4",
+          "P-MEM-001-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 2
+      },
+      {
+        "query": "我收到的商品是假货！这完全欺骗了我。",
+        "bucket": "colloquial",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-RET-001-1",
+          "P-RET-002-2",
+          "P-RET-002-3",
+          "P-REF-002-3",
+          "P-COM-001-4",
+          "P-REF-002-5",
+          "P-RET-001-2",
+          "P-PRI-001-2",
+          "P-PRI-001-1"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们之前说会处理我的问题，到现在还没给我答复。",
+        "bucket": "paraphrase",
+        "family": "投诉",
+        "expected": [
+          "P-COM-001-1"
+        ],
+        "got": [
+          "P-COM-001-4",
+          "P-COM-001-2",
+          "P-LOG-001-1",
+          "P-MEM-001-3",
+          "P-LOG-001-5",
+          "P-COM-001-3",
+          "P-LOG-001-2",
+          "P-REF-001-4",
+          "P-LOG-001-3",
+          "P-LOG-001-4"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们之前说帮我处理退货，到现在还没动静，这是怎么回事？",
+        "bucket": "paraphrase",
+        "family": "投诉",
+        "expected": [
+          "P-COM-001-1",
+          "P-RET-001-1"
+        ],
+        "got": [
+          "P-MEM-001-3",
+          "P-REF-001-4",
+          "P-REF-001-1",
+          "P-LOG-001-5",
+          "P-LOG-001-1",
+          "P-MEM-001-2",
+          "P-REF-001-2",
+          "P-LOG-001-3",
+          "P-REF-001-3",
+          "P-RET-001-4"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 2
+      },
+      {
+        "query": "你们发的商品跟页面上的图片完全不一样。",
+        "bucket": "paraphrase",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-PRI-001-2",
+          "P-REF-002-3",
+          "P-REF-002-2",
+          "P-REF-002-4",
+          "P-REF-002-5",
+          "P-MEM-001-3",
+          "P-RET-002-3",
+          "P-PRI-001-1",
+          "P-RET-001-3",
+          "P-RET-002-4"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们这边怎么处理的，到现在还没给我答复。",
+        "bucket": "paraphrase",
+        "family": "投诉",
+        "expected": [
+          "P-COM-001-1"
+        ],
+        "got": [
+          "P-COM-001-4",
+          "P-LOG-001-5",
+          "P-LOG-001-4",
+          "P-COM-001-2",
+          "P-LOG-001-1",
+          "P-LOG-001-2",
+          "P-MEM-001-3",
+          "P-LOG-001-3",
+          "P-REF-001-4",
+          "P-COM-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们的快递太差了，东西都碎了！我要投诉！",
+        "bucket": "verbatim",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1",
+          "P-COM-001-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-LOG-001-3",
+          "P-LOG-001-2",
+          "P-LOG-001-1",
+          "P-COM-001-4",
+          "P-LOG-001-5",
+          "P-REF-002-5",
+          "P-MEM-001-3",
+          "P-COM-001-3",
+          "P-REF-001-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 2
+      },
+      {
+        "query": "商品和图片差别太大，我要投诉！",
+        "bucket": "verbatim",
+        "family": "投诉",
+        "expected": [
+          "P-REF-002-1",
+          "P-COM-001-1"
+        ],
+        "got": [
+          "P-COM-001-4",
+          "P-REF-002-2",
+          "P-REF-002-5",
+          "P-REF-002-3",
+          "P-RET-002-3",
+          "P-PRI-001-1",
+          "P-MEM-001-3",
+          "P-PRI-001-2",
+          "P-REF-002-4",
+          "P-REF-001-3"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 2
+      },
+      {
+        "query": "我的包裹好像少了东西，还有几件商品没收到。",
+        "bucket": "colloquial",
+        "family": "物流",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-4",
+          "P-LOG-001-5",
+          "P-LOG-001-2",
+          "P-LOG-001-1",
+          "P-REF-001-2",
+          "P-LOG-001-3",
+          "P-REF-001-1",
+          "P-REF-001-3",
+          "P-REF-001-4",
+          "P-RET-002-4"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "收到的包裹有几个物品 missing，怎么回事？",
+        "bucket": "paraphrase",
+        "family": "物流",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-1",
+          "P-LOG-001-4",
+          "P-LOG-001-3",
+          "P-LOG-001-2",
+          "P-LOG-001-5",
+          "P-REF-002-3",
+          "P-MEM-001-3",
+          "P-REF-001-2",
+          "P-REF-002-5",
+          "P-REF-002-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "之前申请过退货但被拒绝了，怎么办？",
+        "bucket": "colloquial",
+        "family": "补偿",
+        "expected": [
+          "P-COM-001-1"
+        ],
+        "got": [
+          "P-REF-001-1",
+          "P-REF-001-2",
+          "P-REF-001-4",
+          "P-REF-001-3",
+          "P-RET-001-1",
+          "P-RET-001-4",
+          "P-REF-002-2",
+          "P-REF-003-1",
+          "P-REF-002-1",
+          "P-LOG-002-2"
+        ],
+        "first_rank": null,
+        "hit_count": 0,
+        "expected_count": 1
+      },
+      {
+        "query": "你们发错了东西，我要怎么处理？",
+        "bucket": "colloquial",
+        "family": "补偿",
+        "expected": [
+          "P-REF-002-1"
+        ],
+        "got": [
+          "P-LOG-001-3",
+          "P-LOG-001-4",
+          "P-LOG-001-2",
+          "P-LOG-001-5",
+          "P-MEM-001-3",
+          "P-LOG-001-1",
+          "P-REF-002-3",
+          "P-REF-001-2",
+          "P-REF-002-5",
+          "P-INV-001-3"
         ],
         "first_rank": null,
         "hit_count": 0,
