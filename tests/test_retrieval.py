@@ -1,30 +1,21 @@
-"""检索链路测试：真实 FAQ 数据能否被 search_knowledge 检出。
+"""检索链路测试：真实 FAQ 数据能否被知识检索节点检出。
 
 与其他测试不同，这些用例不造假数据——用 data/faq 导入的真实内容
 验证端到端可用性。需要 MySQL 与嵌入 API。
 """
 
 import os
-import uuid
 
 import pytest
 
-from app import store, vector_store
-from app.tools import RELEVANCE_THRESHOLD, AgentContext, search_knowledge
-from langgraph.prebuilt import ToolRuntime
+from app import store
+from app.knowledge_node import RELEVANCE_THRESHOLD, run_knowledge_retrieval
 
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("SILICONFLOW_API_KEY", "").strip(),
     reason="未配置 SILICONFLOW_API_KEY",
 )
-
-
-class _RT:
-    """ToolRuntime 的最小替身，工具内只读 context.visitor_id。"""
-
-    def __init__(self, visitor_id: str = "test-visitor"):
-        self.context = AgentContext(visitor_id=visitor_id)
 
 
 @pytest.fixture(scope="module")
@@ -38,6 +29,8 @@ def indexed_faq():
 
     tmpdir = tempfile.mkdtemp()
     os.environ["VECTOR_DB_PATH"] = os.path.join(tmpdir, "milvus.db")
+    from app import vector_store
+
     vector_store.reset_client()
 
     store.init_db()
@@ -54,9 +47,9 @@ def indexed_faq():
     vector_store.reset_client()
 
 
-def _search(query: str, top_k: int = 3) -> list[dict]:
-    result = search_knowledge.func(_RT(), query=query, top_k=top_k)
-    return result.get("results", [])
+async def _search(query: str) -> list[dict]:
+    outcome = await run_knowledge_retrieval(query, "test-visitor", llm=None)
+    return outcome.hits if not outcome.insufficient else []
 
 
 @pytest.mark.parametrize(
@@ -72,9 +65,10 @@ def _search(query: str, top_k: int = 3) -> list[dict]:
         ("会员有什么权益", "P-MEM-001"),
     ],
 )
-def test_search_finds_the_right_policy(indexed_faq, question, expected_doc):
+@pytest.mark.anyio
+async def test_search_finds_the_right_policy(indexed_faq, question, expected_doc):
     """真实提问必须能检出对应政策文档。"""
-    results = _search(question)
+    results = await _search(question)
     assert results, f"「{question}」没有检出任何知识"
 
     doc_ids = [r["doc_id"] for r in results]
@@ -83,7 +77,8 @@ def test_search_finds_the_right_policy(indexed_faq, question, expected_doc):
     )
 
 
-def test_borderline_complaint_is_rejected(indexed_faq):
+@pytest.mark.anyio
+async def test_borderline_complaint_is_rejected(indexed_faq):
     """「要投诉你们的服务」得分 0.63，落在检索阈值与拒答阈值之间。
 
     r14 把证据充分性阈值升到 0.65 后，这条被判定为证据不足而拒答。
@@ -93,15 +88,16 @@ def test_borderline_complaint_is_rejected(indexed_faq):
     它同时暴露了阈值方法本身的局限——0.63（投诉）与 0.657（买一送一）
     之间没有可靠的分界线，详见 docs/dev-notes/r14.md 的遗留问题。
     """
-    results = _search("要投诉你们的服务")
+    results = await _search("要投诉你们的服务")
     assert results == [], (
         f"阈值 0.65 下「要投诉」应被拒答，实际返回 {[r['title'] for r in results]}"
     )
 
 
-def test_results_include_full_source_content(indexed_faq):
+@pytest.mark.anyio
+async def test_results_include_full_source_content(indexed_faq):
     """返回内容必须取自 MySQL 原文，而不是向量库里的拼接文本。"""
-    results = _search("退货的运费谁出")
+    results = await _search("退货的运费谁出")
     assert results
 
     top = results[0]
@@ -124,38 +120,30 @@ def _faq_id(result: dict) -> str:
     raise AssertionError(f"找不到 {result['doc_id']} / {result['section']}")
 
 
-def test_results_sorted_by_score(indexed_faq):
-    results = _search("退货运费谁出", top_k=5)
+@pytest.mark.anyio
+async def test_results_sorted_by_score(indexed_faq):
+    results = await _search("退货运费谁出")
     scores = [r["score"] for r in results]
     assert scores == sorted(scores, reverse=True)
 
 
-def test_all_results_above_threshold(indexed_faq):
-    results = _search("退货运费谁出", top_k=5)
+@pytest.mark.anyio
+async def test_all_results_above_threshold(indexed_faq):
+    results = await _search("退货运费谁出")
     assert all(r["score"] >= RELEVANCE_THRESHOLD for r in results)
 
 
-def test_respects_top_k(indexed_faq):
-    for k in (1, 3, 5):
-        results = _search("退货", top_k=k)
-        assert len(results) <= k
-
-
-def test_top_k_is_clamped(indexed_faq):
-    """超出范围的值必须被夹到 1..5，不能传给 Milvus。"""
-    assert len(_search("退货", top_k=100)) <= 5
-    assert len(_search("退货", top_k=0)) <= 5
-
-
-def test_irrelevant_question_returns_empty(indexed_faq):
+@pytest.mark.anyio
+async def test_irrelevant_question_returns_empty(indexed_faq):
     """与政策无关的问题不应硬凑结果，否则模型会拿无关条款回答。"""
-    results = _search("今天天气怎么样")
+    results = await _search("今天天气怎么样")
     assert results == [], f"无关问题检出了 {[r['title'] for r in results]}"
 
 
-def test_no_keyword_collision_with_products(indexed_faq):
+@pytest.mark.anyio
+async def test_no_keyword_collision_with_products(indexed_faq):
     """问商品问题不应命中政策条款——两者走不同的工具。"""
-    results = _search("杯子多少钱")
+    results = await _search("杯子多少钱")
     titles = [r["title"] for r in results]
     assert all("退货" not in t or "商品" not in t for t in titles), titles
 
@@ -181,7 +169,8 @@ def test_threshold_has_margin_on_product_queries(indexed_faq):
     )
 
 
-def test_irrelevant_queries_all_below_threshold(indexed_faq):
+@pytest.mark.anyio
+async def test_irrelevant_queries_all_below_threshold(indexed_faq):
     """一组与政策无关的问题必须全部被阈值挡在门外。
 
     单条用例只能证明那一条，这里用一组覆盖不同的无关主题，
@@ -195,7 +184,7 @@ def test_irrelevant_queries_all_below_threshold(indexed_faq):
         "明天几点开会",
     ]
     for question in irrelevant:
-        results = _search(question)
+        results = await _search(question)
         assert results == [], (
             f"无关问题「{question}」检出了 {[r['title'] for r in results]}"
         )

@@ -29,7 +29,6 @@ TOOL_LABELS = {
     "lookup_product": "商品",
     "list_my_orders": "订单",
     "lookup_work_order": "工单",
-    "search_knowledge": "知识库",
     "draft_work_order": "工单草稿",
 }
 
