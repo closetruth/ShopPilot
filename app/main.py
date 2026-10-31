@@ -15,7 +15,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field, ValidationError
 
 from app import store, vector_store
-from app.agent import build_agent
+from app.agent import build_business_agent
 from app.llm import ConfigError, get_llm
 from app.markdown_split import split_markdown
 from app.schemas import WorkOrderCreate
@@ -495,7 +495,7 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         collected: list[str] = []
         saved = False
         try:
-            agent = build_agent()
+            agent = build_business_agent()
             messages = []
             for m in history:
                 cls = HumanMessage if m["role"] == "user" else AIMessage
