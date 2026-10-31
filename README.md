@@ -1,6 +1,8 @@
 # ShopPilot
 
-电商智能客服系统。AI 客服能查真实商品数据与顾客自己的工单进度，支持多会话。
+电商智能客服系统。对话走 LangGraph 图：意图分流四路（知识检索 / 业务
+agent / 投诉模板 / 闲聊模板），AI 客服能查真实商品数据与顾客自己的工单
+进度，会话工作状态经 MySQL checkpoint 持久化，支持多会话。
 
 ## 快速开始
 
@@ -25,6 +27,7 @@ uv run uvicorn app.main:app --reload
 | `MYSQL_HOST` / `MYSQL_PORT` | 数据库地址 | `127.0.0.1` / `3307` |
 | `MYSQL_USER` / `MYSQL_PASSWORD` | 数据库账号 | `shoppilot` / `shoppilot` |
 | `MYSQL_DATABASE` | 库名 | `shoppilot` |
+| `CHECKPOINT_BACKEND` | 会话状态 checkpoint 存储 | `mysql`（默认）/ `sqlite` |
 | `SILICONFLOW_API_KEY` | 嵌入服务密钥 | `sk-...` |
 | `EMBED_MODEL` | 嵌入模型 | `BAAI/bge-m3` |
 | `EMBED_BASE_URL` | 嵌入服务地址 | `https://api.siliconflow.cn/v1` |
@@ -48,19 +51,25 @@ uv run pytest
 ```
 app/
   main.py      FastAPI：SSE 对话、历史、会话列表、静态托管
-  agent.py     LangGraph ReAct Agent 构建
-  tools.py     工具定义：查商品 / 查订单 / 查工单 / 查政策 / 起草工单
+  graph.py     StateGraph 组装：消解→意图→四路分流→日志
+  agent.py     业务主力 agent（ReAct，业务四件工具，步数/token 上限）
+  intent.py    意图分类：规则先行，LLM 兜底
+  resolve.py   指代消解：代词/短消息按需触发
+  knowledge_node.py 知识检索节点：向量检索→0.65 置信度闸→生成回答
+  templates.py 投诉/闲聊固定话术（零 LLM），投诉自动建工单
+  tools.py     业务工具：查商品 / 查订单 / 查工单 / 起草工单
+  checkpointer.py 会话工作状态 checkpoint（MySQL，SQLite 兜底）
   schemas.py   工具参数校验模型
   llm.py       ChatOpenAI 工厂（OpenAI 兼容）
   embedding.py BGE-M3 嵌入（硅基流动）
-  vector_store.py Milvus Lite 索引与检索（仅 FAQ）
+  vector_store.py Milvus 索引与检索（仅 FAQ）
   db.py        MySQL 连接、建表、旧表补列
   repo/
     chats.py     会话与消息
     commerce.py  商品、订单、工单、工单草稿
     knowledge.py FAQ 政策知识
+    insights.py  低置信度问题、agent 轨迹
   store.py     上述仓储的转发门面，调用方统一从这里访问
-  prompt.py    客服人设与工具使用规则
   static/      聊天页面
 scripts/
   seed.py                    演示数据（幂等）
@@ -69,7 +78,6 @@ scripts/
   migrate_sqlite_to_mysql.py 旧 SQLite 数据导入（幂等，支持 --dry-run）
 data/faq/      政策文档（随仓库版本控制）
 docs/          设计文档与提示词
-plans/         实施计划
 ```
 
 ## 知识库管理
@@ -125,6 +133,22 @@ SSE 事件：
 | `[DONE]` | 正常结束 |
 | `{"error": "..."}` | 出错 |
 
+## 对话流程
+
+每条消息经过 LangGraph 图：
+
+```
+指代消解（按需） → 意图识别（规则先行，LLM 兜底）
+  → 知识检索：向量检索 → 0.65 置信度闸 → 带引用回答 / 拒答+落库
+  → 业务数据：主力 agent（业务四件工具，步数 15 / token 8000 上限）
+  → 投诉：固定话术 + 自动建「投诉建议」工单
+  → 闲聊：固定话术（零 LLM）
+  → 日志：agent_traces 落一条（意图/置信度/节点路径/耗时）
+```
+
+消息历史存 MySQL 消息表；图的会话工作状态（消解结果、意图、槽位、轮次）
+经 checkpoint 存同一 MySQL 库，跨进程续跑。
+
 ## 工具
 
 | 工具 | 能力 | 约束 |
@@ -133,7 +157,6 @@ SSE 事件：
 | `list_my_orders` | 列出当前顾客的订单 | 无参数，只返回本人订单 |
 | `lookup_work_order` | 按订单号查工单进度 | 只能查本人；查不到时不区分「不存在」与「不属于你」 |
 | `draft_work_order` | 起草待确认的工单 | **不写库**，仅生成草稿供前端确认 |
-| `search_knowledge` | 按语义检索商品与本人历史工单 | 只能命中公开数据与本人私有数据 |
 
 参数经 Pydantic 校验，非法时返回结构化错误让模型自行纠正，不中断对话。
 
@@ -189,5 +212,5 @@ AI 无法直接建单。工单只可能由顾客点击产生，两条路径：
 
 ## 暂不包含
 
-登录、跨设备身份、知识库/RAG、工具写操作（改工单、退款）、转人工、部署。
+登录、跨设备身份、工具写操作（改工单、退款）、转人工、部署。
 详见 `docs/superpowers/specs/`。
