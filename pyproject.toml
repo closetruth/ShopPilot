@@ -9,7 +9,6 @@ dependencies = [
     "langchain-openai>=0.3",
     "python-dotenv>=1.0",
     "langgraph>=1.2.18",
-    "pymysql>=1.2.3",
     "cryptography>=50.0.2",
     "pymilvus[milvus-lite]>=3.0.2",
     "milvus-lite>=3.2.2",
@@ -17,6 +16,7 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "langgraph-checkpoint-mysql>=3.0.0",
     "langgraph-checkpoint-sqlite>=3.1.2",
+    "aiomysql>=0.3.2",
 ]
 
 [dependency-groups]
@@ -28,3 +28,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true

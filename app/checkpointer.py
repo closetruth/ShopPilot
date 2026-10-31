@@ -13,14 +13,12 @@ from __future__ import annotations
 
 import os
 import sqlite3
-import threading
+import asyncio
 from pathlib import Path
 
 import pymysql
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.mysql.base import MIGRATIONS
-# PyMySQLSaver 只在子模块里，包的 __init__ 并没有导出它（docstring 里的示例是错的）
-from langgraph.checkpoint.mysql.pymysql import PyMySQLSaver
 
 from app.db import conn_params
 
@@ -33,44 +31,67 @@ _COLLATION = "utf8mb4_0900_ai_ci"
 
 _SQLITE_PATH = Path(__file__).resolve().parent.parent / "data" / "checkpoints.db"
 
-_lock = threading.Lock()
+_lock = asyncio.Lock()
 _saver: BaseCheckpointSaver | None = None
 
 
-def get_checkpointer() -> BaseCheckpointSaver:
+async def get_checkpointer() -> BaseCheckpointSaver:
     """按 CHECKPOINT_BACKEND（mysql | sqlite，默认 mysql）返回进程级单例。
 
-    首次调用建连接、建表（全部幂等，可重复启动）；之后复用同一 saver，
-    进程内共享一个连接，图编译时直接传给它。
+    异步构造：aiomysql 连接必须建在事件循环内（同步上下文建的连接绑定
+    asyncio.run 的临时循环，循环关闭即失效）。FastAPI lifespan 与测试里
+    均 await 本函数。
     """
     global _saver
     if _saver is None:
-        with _lock:
+        async with _lock:
             if _saver is None:
                 backend = os.getenv("CHECKPOINT_BACKEND", "mysql").strip().lower()
-                saver = _build_checkpointer(backend)
-                saver.setup()
+                saver = await _build_checkpointer(backend)
+                await saver.setup()
                 _saver = saver
     return _saver
 
 
-def _build_checkpointer(backend: str) -> BaseCheckpointSaver:
+async def _build_checkpointer(backend: str) -> BaseCheckpointSaver:
     if backend == "mysql":
-        return _build_mysql_checkpointer()
+        return await build_mysql_saver()
     if backend == "sqlite":
         return _build_sqlite_checkpointer()
     raise ValueError(f"未知 CHECKPOINT_BACKEND: {backend!r}，支持 mysql / sqlite")
 
 
-def _build_mysql_checkpointer() -> PyMySQLSaver:
+async def build_mysql_saver() -> BaseCheckpointSaver:
+    """建一个 AIOMySQLSaver：预建表（同步连接）+ 异步连接（当前事件循环）。
+
+    get_checkpointer 的单例路径与测试的独立实例路径共用。
+    """
+    sync_conn = pymysql.connect(**conn_params())
+    _ensure_mysql_tables(sync_conn)
+    sync_conn.close()
+
     params = conn_params()
-    # 包的写路径走 conn.begin()/commit() 显式事务，读路径是单条语句；
-    # 跟包自带的 from_conn_string 一致用 autocommit，避免读连接停在未提交事务里
+    # aiomysql 参数名不同：db（非 database）；无 collation 参数，
+    # 排序规则改由 init_command 设会话变量，与读路径的 JSON CTE 对齐
+    params["db"] = params.pop("database")
+    params.pop("cursorclass", None)
     params["autocommit"] = True
-    params["collation"] = _COLLATION
-    conn = pymysql.connect(**params)
-    _ensure_mysql_tables(conn)
-    return PyMySQLSaver(conn)
+    params["init_command"] = f"SET collation_connection = '{_COLLATION}'"
+
+    import aiomysql
+    import aiomysql.connection as _aconn
+    import pymysql.converters as _conv
+    from langgraph.checkpoint.mysql.aio import AIOMySQLSaver
+
+    # pymysql 1.2+ 把 escape_bytes_prefixed 换成哨兵字符串
+    # 「DO NOT IMPORT THIS!!!」（issue #1274，本意是禁外部 import），
+    # 而 aiomysql 0.3.2 恰好在 escape() 里 import 了它——blob 写入即崩。
+    # 补回真实现（_binary 十六进制字面量），包升级移除此 workaround 时删除
+    if not callable(_aconn.escape_bytes_prefixed):
+        _aconn.escape_bytes_prefixed = _conv.escape_bytes
+
+    conn = await aiomysql.connect(**params)
+    return AIOMySQLSaver(conn)
 
 
 def _ensure_mysql_tables(conn: pymysql.connections.Connection) -> None:

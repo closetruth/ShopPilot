@@ -12,10 +12,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from langchain_core.messages import AIMessage, HumanMessage
+import time
+
 from pydantic import BaseModel, Field, ValidationError
 
 from app import store, vector_store
-from app.agent import build_business_agent
+from app.checkpointer import get_checkpointer
+from app.graph import build_graph
 from app.llm import ConfigError, get_llm
 from app.markdown_split import split_markdown
 from app.schemas import WorkOrderCreate
@@ -43,6 +46,8 @@ async def lifespan(app: FastAPI):
     except ConfigError as exc:
         logger.error("%s", exc)
         raise
+    # checkpoint 连接建在事件循环内（aiomysql 绑定循环，不能事后建）
+    await get_checkpointer()
     yield
 
 
@@ -494,16 +499,22 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         yield _sse({"conversation_id": conversation_id})
         collected: list[str] = []
         saved = False
+        started = time.monotonic()
         try:
-            agent = build_business_agent()
+            graph = build_graph(checkpointer=await get_checkpointer())
             messages = []
             for m in history:
                 cls = HumanMessage if m["role"] == "user" else AIMessage
                 messages.append(cls(content=m["content"]))
             messages.append(HumanMessage(content=req.message))
 
-            async for event in agent.astream_events(
-                {"messages": messages},
+            async for event in graph.astream_events(
+                {
+                    "message": req.message,
+                    "history": history,
+                    "visitor_id": req.visitor_id,
+                    "messages": messages,
+                },
                 context=AgentContext(visitor_id=req.visitor_id),
                 config={"configurable": {"thread_id": conversation_id}},
                 version="v2",
@@ -531,10 +542,27 @@ async def chat(req: ChatRequest) -> StreamingResponse:
                         if draft is not None:
                             yield _sse({"work_order_draft": draft})
 
+            # 模板/知识路径的 final_text 不经 LLM 流式（或拼接生成），
+            # 事件流里没有逐 token delta，从最终 state 一次性补发；
+            # business 路径 delta 已流过，collected 非空则跳过
+            state = await graph.aget_state(
+                {"configurable": {"thread_id": conversation_id}}
+            )
+            final_text = (state.values or {}).get("final_text", "")
+            if not collected and final_text:
+                collected.append(final_text)
+                yield _sse({"delta": final_text})
+
             assistant_text = "".join(collected).strip()
             if assistant_text:
                 store.append_message(conversation_id, "assistant", assistant_text)
                 saved = True
+
+            # 轨迹落库：观测数据，失败不影响对话（record_trace 自兜底）
+            _record_turn_trace(
+                conversation_id, req.visitor_id, req.message,
+                state.values or {}, started,
+            )
             yield _sse("[DONE]")
         except Exception as exc:  # noqa: BLE001 - 上游任何异常都要转成前端可见错误
             logger.exception("对话失败")
@@ -551,6 +579,33 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def _record_turn_trace(
+    conversation_id: str,
+    visitor_id: str,
+    message: str,
+    state: dict,
+    started: float,
+) -> None:
+    """把一轮对话的工作字段写入 agent_traces。"""
+    try:
+        store.record_trace(
+            conversation_id=conversation_id,
+            visitor_id=visitor_id,
+            message=message,
+            intent=state.get("intent", "unknown"),
+            intent_method=state.get("intent_method", "unknown"),
+            node_path=state.get("node_path", ""),
+            latency_ms=int((time.monotonic() - started) * 1000),
+            resolved_query=state.get("resolved_query"),
+            confidence=state.get("intent_confidence"),
+            top_score=state.get("top_score"),
+            tool_calls=state.get("tool_calls"),
+            steps=state.get("steps"),
+        )
+    except Exception:  # noqa: BLE001 - 轨迹是观测数据，失败不影响对话
+        logger.warning("轨迹记录失败", exc_info=True)
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
