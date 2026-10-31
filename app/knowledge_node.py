@@ -56,8 +56,8 @@ ANSWER_PROMPT = """你是店铺客服。根据下面的知识资料回答顾客�
 顾客问题：{query}
 
 规则：
-- 只依据资料回答，每个结论后标注来源编号，格式 [P-XXX-000-0]
-- 只能引用资料里出现的编号，不得编造
+- 只依据资料回答，每个结论后标注来源编号，格式如 [P-RET-001-3]
+- 只能引用资料方括号里出现的编号，不得编造
 - 三句话以内，直接回答
 - 资料回答不了问题时，只输出：这个问题我这边没有查到相关规定。"""
 
@@ -142,7 +142,7 @@ async def _compose_answer(query: str, results: list[dict], llm) -> str:
     照 app/intent.py 的降级风格。
     """
     sources = "\n\n".join(
-        f"[{r['doc_id']}-{r['section']}] {r['title']}：{r['content']}" for r in results
+        f"[{r['faq_id']}] {r['title']}：{r['content']}" for r in results
     )
     if llm is None:
         return _fallback_text(results)
@@ -161,8 +161,12 @@ async def _compose_answer(query: str, results: list[dict], llm) -> str:
 
 
 def _fallback_text(results: list[dict]) -> str:
-    """资料原文逐条拼接。生硬但保真：内容与编号都来自数据库原文。"""
-    return "\n\n".join(f"{r['content']}[{r['doc_id']}-{r['section']}]" for r in results)
+    """资料原文逐条拼接。生硬但保真：内容与编号都来自数据库原文。
+
+    编号用 faq_id（如 P-RET-001-3）——前端 CITE_RE 与 /api/faq/{id}
+    都按这个键解析，悬停才能定位到条款。
+    """
+    return "\n\n".join(f"{r['content']}[{r['faq_id']}]" for r in results)
 
 
 def _record_low_confidence(
