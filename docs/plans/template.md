@@ -31,10 +31,11 @@
 
 1. 先给方案（结构、接口、数据模型、非目标），我说开工再动手
 2. 设计文档写到 `docs/superpowers/specs/YYYY-MM-DD_r<轮次>-<topic>-design.md`
-3. 实施计划写到 `plans/YYYY-MM-DD_r<轮次>-<topic>-plan.md`，带可勾选清单
+3. 实施计划写到 `/docs/plans/YYYY-MM-DD_r<轮次>-<topic>-plan.md`，带可勾选清单
 4. 本轮提示词写到 `docs/prompts/YYYY-MM-DD_r<轮次>-<topic>-prompt.md`
-5. 每个可验证的步骤一个提交，分支用 `main`
-6. 完成后**在浏览器实跑验收**，不能只跑单测就说完成
+5. 开发日志写到 里追记开发过程,每完成一个阶段(brainstorm 定稿、计划评审通过、每个任务完成、code review 结论、finish)就补一段,记四样:我这一步发的关键原话、你的关键产出(spec / plan 路径、评审结论)、我拒绝或纠偏了什么、翻车与返工;不许收尾时一次性补记
+6. 每个可验证的步骤一个提交，分支用 `main`
+7. 完成后**在浏览器实跑验收**，不能只跑单测就说完成
 
 轮次号接着上一轮的序号往下编。
 
