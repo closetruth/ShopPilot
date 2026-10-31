@@ -263,10 +263,12 @@ def create_work_order(
     order_no: str | None,
     issue_type: str,
     description: str,
+    source: str = "ai",
 ) -> str:
     """新建工单，返回对外工单号。归属与状态由服务端强制，不由模型传入。
 
     order_no 为空时表示不与具体订单关联（咨询、投诉建议类）。
+    source 标记建单来源：ai（agent 起草确认）、template（投诉模板自动建）。
     """
     work_order_no = "WO" + uuid.uuid4().hex[:10].upper()
 
@@ -289,7 +291,7 @@ def create_work_order(
                 description,
                 issue_type,
                 "普通",
-                "ai",
+                source,
                 ts,
                 ts,
             ),
