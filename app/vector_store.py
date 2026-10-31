@@ -133,6 +133,9 @@ def delete_by_source(source: str, source_id: str) -> bool:
         client.delete(
             COLLECTION, filter=f'source == "{source}" and source_id == "{source_id}"'
         )
+        # 删除后必须 flush：standalone 部署下删除对后续查询不是立即可见的，
+        # 不 flush 会出现「管理端已删、检索仍命中」的窗口
+        client.flush(COLLECTION)
         return True
     except Exception as exc:  # noqa: BLE001
         logger.warning("向量删除跳过（%s）：%s", type(exc).__name__, exc)
