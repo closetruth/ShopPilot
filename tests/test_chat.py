@@ -1,4 +1,4 @@
-from app.main import _text_of
+from app.api.customer import _text_of
 
 
 def test_text_of_plain_string():

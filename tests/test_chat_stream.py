@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import main as app_main
+from app.api import _graph as graph_singleton
 from app.graph import build_graph
 
 
@@ -36,7 +37,7 @@ def client(monkeypatch):
     monkeypatch.setattr("app.graph.run_business_agent_with_limit", fake_run)
 
     graph = build_graph(checkpointer=MemorySaver(), llm=None, llm_quiet=None)
-    monkeypatch.setattr(app_main, "_compiled_graph", graph)
+    monkeypatch.setattr(graph_singleton, "_compiled_graph", graph)
 
     from app.main import app
 
