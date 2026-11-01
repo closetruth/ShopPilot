@@ -999,6 +999,7 @@ dependencies = [
     { name = "pymysql" },
     { name = "python-dotenv" },
     { name = "rank-bm25" },
+    { name = "tiktoken" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1023,6 +1024,7 @@ requires-dist = [
     { name = "pymysql", specifier = ">=1.2.3" },
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "rank-bm25", specifier = ">=0.2.2" },
+    { name = "tiktoken", specifier = ">=0.14.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
