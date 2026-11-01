@@ -21,6 +21,11 @@ from app.intent import IntentResult, classify_by_rules, classify_intent
     ("退货运费谁出", "knowledge"), ("发票能开吗", "knowledge"),
     ("买一送一能退一件吗", "knowledge"),        # 控制器修正：含「退」但无订单引用 + 疑问模式
     ("这个商品我能用吗", None),                 # 控制器新增：无规则命中 → LLM 兜底路径
+    ("包装破了", "knowledge"),                  # r16：售后诉求词钉 knowledge——LLM 兜底曾把
+                                                # 「破了」理解成情绪误判 complaint(0.75)
+    ("杯子摔坏了想退", "knowledge"),            # 同族：摔坏是售后陈述
+    ("快递好久没动", "knowledge"),              # r16 验收暴露：LLM 兜底曾误判 business(查件)
+    ("物流太慢了", "knowledge"),                # 同族：物流慢是延迟补偿问题
 ])
 def test_rules(message, expected):
     intent, confident = classify_by_rules(message)

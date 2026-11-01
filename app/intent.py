@@ -71,6 +71,15 @@ _KNOWLEDGE_QUESTION_RE = re.compile(
     r"谁出|谁付|谁来|吗|呢"
 )
 
+# 售后诉求描述词：商品/包装/物流出状况的客观陈述，是售后问题不是投诉
+# 或查件。LLM 兜底会把「包装破了」判成投诉（0.75）、「快递好久没动」
+# 判成查订单（business）——这类词在投诉规则之后、业务/知识规则之前
+# 直接钉进 knowledge
+_AFTERSALE_RE = re.compile(
+    r"坏了|破了|破损|摔坏|压坏|漏了|开裂|掉漆|失灵|用不了|"
+    r"没动静|没更新|没动|不动了|迟迟不到|太慢了|丢件|没收到货"
+)
+
 
 def classify_by_rules(message: str) -> tuple[str, bool]:
     """规则分类：返回 (意图, 是否高置信)；无规则命中时返回 (None, False)。"""
@@ -80,6 +89,8 @@ def classify_by_rules(message: str) -> tuple[str, bool]:
         return "complaint", True
     if _ORDER_NO_RE.search(message) or _ORDER_WORD_RE.search(message):
         return "business", True
+    if _AFTERSALE_RE.search(message):
+        return "knowledge", True
     if _KNOWLEDGE_TOPIC_RE.search(message) and _KNOWLEDGE_QUESTION_RE.search(message):
         return "knowledge", True
     return None, False
