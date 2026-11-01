@@ -23,13 +23,25 @@ from app.templates import chitchat_reply, complaint_reply
 logger = logging.getLogger(__name__)
 
 
-class ConversationState(TypedDict, total=False):
-    """会话工作状态。消息历史不进 state（设计定稿：MySQL 存消息）。
+class _TurnInput(TypedDict, total=False):
+    """每轮输入。LangGraph 的 state 是「本轮全量输入+产出」的通道集合，
+    这些字段由 invoke 传入、被节点读取，不跨轮累积。"""
 
-    - resolved_query / intent / final_text: 本轮工作产物
-    - pending_topic / turn_count / collected_slots: 跨轮槽位，checkpoint 持久化
-    - stopped_by: agent 触线标记（main 据此补发转人工话术）
-    """
+    message: str
+    history: list[dict]
+    visitor_id: str
+
+
+class _CrossTurnSlots(TypedDict, total=False):
+    """跨轮槽位。checkpoint 持久化——这是会话恢复的唯一来源。"""
+
+    pending_topic: str
+    collected_slots: dict
+    turn_count: int
+
+
+class _TurnOutput(TypedDict, total=False):
+    """本轮工作产物，节点逐级写入。"""
 
     resolved_query: str
     intent: str
@@ -37,24 +49,28 @@ class ConversationState(TypedDict, total=False):
     intent_method: str
     final_text: str
     node_path: str
-    pending_topic: str
-    collected_slots: dict
-    turn_count: int
+
+
+class _Observability(TypedDict, total=False):
+    """观测数据，喂 agent_traces（数据飞轮），不参与业务流程。"""
+
     top_score: float | None
     tool_calls: list[str]
     steps: int
     total_tokens: int | None
     stopped_by: str | None
-    # r16 改写观测：词条与是否回退，供轨迹落库（数据飞轮）
+    # r16 改写观测：词条与是否回退
     rewritten_terms: list[str]
     rewritten_query: str
     fallback_used: bool
-    # 本轮输入（消息/历史/访客身份/历史消息对象）。LangGraph 的 state 是
-    # 「本轮全量输入+产出」的通道集合，这些字段每轮由 invoke 传入被覆盖、
-    # 不跨轮累积；跨轮延续的只有上面几个工作槽位
-    message: str
-    history: list[dict]
-    visitor_id: str
+
+
+# 多继承只做代码组织：LangGraph 按 __annotations__ 解析 schema，合并后
+# 仍是 flat channel，节点读写方式与分组前完全一致
+class ConversationState(
+    _TurnInput, _CrossTurnSlots, _TurnOutput, _Observability, total=False
+):
+    """会话工作状态。消息历史不进 state（设计定稿：MySQL 存消息）。"""
 
 
 def build_graph(
