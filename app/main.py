@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app import store, vector_store
 from app.checkpointer import get_checkpointer
 from app.graph import build_graph
-from app.llm import ConfigError, get_llm
+from app.llm import ConfigError, get_llm, get_llm_quiet
 from app.markdown_split import split_markdown
 from app.schemas import WorkOrderCreate
 from app.tools import AgentContext
@@ -36,6 +36,20 @@ TOOL_LABELS = {
 }
 
 DRAFT_TOOL = "draft_work_order"
+
+# 图结构固定、llm/checkpointer 都是单例：compile 一次整个进程复用
+_compiled_graph = None
+
+
+async def _get_graph():
+    global _compiled_graph
+    if _compiled_graph is None:
+        _compiled_graph = build_graph(
+            checkpointer=await get_checkpointer(),
+            llm=get_llm(),
+            llm_quiet=get_llm_quiet(),
+        )
+    return _compiled_graph
 
 
 @asynccontextmanager
@@ -501,19 +515,13 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         saved = False
         started = time.monotonic()
         try:
-            graph = build_graph(checkpointer=await get_checkpointer())
-            messages = []
-            for m in history:
-                cls = HumanMessage if m["role"] == "user" else AIMessage
-                messages.append(cls(content=m["content"]))
-            messages.append(HumanMessage(content=req.message))
+            graph = await _get_graph()
 
             async for event in graph.astream_events(
                 {
                     "message": req.message,
                     "history": history,
                     "visitor_id": req.visitor_id,
-                    "messages": messages,
                 },
                 context=AgentContext(visitor_id=req.visitor_id),
                 config={"configurable": {"thread_id": conversation_id}},
@@ -543,13 +551,19 @@ async def chat(req: ChatRequest) -> StreamingResponse:
                             yield _sse({"work_order_draft": draft})
 
             # 模板/知识路径的 final_text 不经 LLM 流式（或拼接生成），
-            # 事件流里没有逐 token delta，从最终 state 一次性补发；
-            # business 路径 delta 已流过，collected 非空则跳过
+            # 事件流里没有逐 token delta，从最终 state 一次性补发。
+            # business 路径 delta 已流过则跳过；触线时 final_text 是转人工
+            # 话术，必须补发——触线前流出的部分回答不算完整回答
             state = await graph.aget_state(
                 {"configurable": {"thread_id": conversation_id}}
             )
-            final_text = (state.values or {}).get("final_text", "")
-            if not collected and final_text:
+            values = state.values or {}
+            final_text = values.get("final_text", "")
+            stopped_by = values.get("stopped_by")
+            if stopped_by and final_text:
+                collected = [final_text]
+                yield _sse({"delta": final_text})
+            elif not collected and final_text:
                 collected.append(final_text)
                 yield _sse({"delta": final_text})
 
@@ -560,8 +574,7 @@ async def chat(req: ChatRequest) -> StreamingResponse:
 
             # 轨迹落库：观测数据，失败不影响对话（record_trace 自兜底）
             _record_turn_trace(
-                conversation_id, req.visitor_id, req.message,
-                state.values or {}, started,
+                conversation_id, req.visitor_id, req.message, values, started
             )
             yield _sse("[DONE]")
         except Exception as exc:  # noqa: BLE001 - 上游任何异常都要转成前端可见错误

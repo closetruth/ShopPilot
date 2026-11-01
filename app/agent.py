@@ -96,11 +96,15 @@ def _usage_of(msg) -> int:
     return int(usage.get("input_tokens", 0)) + int(usage.get("output_tokens", 0))
 
 
-async def run_business_agent_with_limit(inputs: dict, *, llm=None) -> dict:
+async def run_business_agent_with_limit(
+    inputs: dict, *, visitor_id: str, llm=None
+) -> dict:
     """带双上限的 agent 执行。
 
+    visitor_id 必须显式传入：context 决定业务工具能看到谁的订单/工单，
+    硬编码占位符会让四件套全部查空。
     返回 {"final_text", "stopped_by": "step_limit"|"token_limit"|None,
-    "tool_calls", "steps"}。触线不抛异常，返回转人工话术。
+    "tool_calls", "steps", "total_tokens"}。触线不抛异常，返回转人工话术。
     """
     agent = build_business_agent(llm=llm)
     tool_calls: list[str] = []
@@ -111,7 +115,7 @@ async def run_business_agent_with_limit(inputs: dict, *, llm=None) -> dict:
     try:
         async for chunk in agent.astream(
             inputs,
-            context=AgentContext(visitor_id="__limit_runner__"),
+            context=AgentContext(visitor_id=visitor_id),
             config={"recursion_limit": STEP_LIMIT},
             stream_mode="updates",
         ):
@@ -150,6 +154,7 @@ async def run_business_agent_with_limit(inputs: dict, *, llm=None) -> dict:
         "stopped_by": None,
         "tool_calls": tool_calls,
         "steps": steps,
+        "total_tokens": tokens_used or None,
     }
 
 

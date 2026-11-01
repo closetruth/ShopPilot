@@ -40,7 +40,7 @@ class ScriptedLLM:
 def _mock_vector(monkeypatch, hits: list[dict]):
     from app import vector_store
 
-    async def fake_search(query, visitor_id, top_k=3):
+    def fake_search(query, visitor_id, top_k=3):
         return hits
 
     monkeypatch.setattr(vector_store, "search", fake_search)

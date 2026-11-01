@@ -71,15 +71,13 @@ async def run_knowledge_retrieval(
     主 LLM；测试或降级场景可省略）。
     """
     top_k = 3
-    # 嵌入是同步 HTTP 调用；检索与原文组装是纯同步逻辑，包一层避免阻塞事件循环。
-    # monkeypatch 替换 vector_store.search 为 async 函数时同样兼容
+    # 嵌入是同步 HTTP 调用，整个 search（嵌入+查询）放进线程池执行，
+    # 避免阻塞事件循环
     import anyio
 
-    search_result = vector_store.search(resolved_query, "", top_k=top_k)
-    if hasattr(search_result, "__await__"):
-        hits = await search_result
-    else:
-        hits = await anyio.to_thread.run_sync(lambda: search_result)
+    hits = await anyio.to_thread.run_sync(
+        lambda: vector_store.search(resolved_query, "", top_k=top_k)
+    )
     hits = sorted(hits, key=lambda h: h["score"], reverse=True)[:top_k]
 
     max_score = hits[0]["score"] if hits else 0.0

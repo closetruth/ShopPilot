@@ -8,12 +8,10 @@ MySQL 消息表，每轮作为输入传入）。
 from __future__ import annotations
 
 import logging
-import time
-from typing import Annotated, Any, TypedDict
+from typing import Any, TypedDict
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
-from langgraph.graph.message import add_messages
 
 from app import store
 from app.agent import run_business_agent_with_limit
@@ -28,14 +26,11 @@ logger = logging.getLogger(__name__)
 class ConversationState(TypedDict, total=False):
     """会话工作状态。消息历史不进 state（设计定稿：MySQL 存消息）。
 
-    - input: 每轮输入（原消息 + 历史摘要），不持久化
     - resolved_query / intent / final_text: 本轮工作产物
     - pending_topic / turn_count / collected_slots: 跨轮槽位，checkpoint 持久化
+    - stopped_by: agent 触线标记（main 据此补发转人工话术）
     """
 
-    message: str
-    history: list[dict]
-    visitor_id: str
     resolved_query: str
     intent: str
     intent_confidence: float
@@ -48,12 +43,29 @@ class ConversationState(TypedDict, total=False):
     top_score: float | None
     tool_calls: list[str]
     steps: int
-    # add_messages 通道：主力 agent 的事件流里 SSE 需要它，但不进持久化判断
-    messages: Annotated[list, add_messages]
+    total_tokens: int | None
+    stopped_by: str | None
+    # 本轮输入（消息/历史/访客身份/历史消息对象）。LangGraph 的 state 是
+    # 「本轮全量输入+产出」的通道集合，这些字段每轮由 invoke 传入被覆盖、
+    # 不跨轮累积；跨轮延续的只有上面几个工作槽位
+    message: str
+    history: list[dict]
+    visitor_id: str
 
 
-def build_graph(*, checkpointer: BaseCheckpointSaver | None = None, llm=None):
-    """构建对话主图。生产传 get_checkpointer()；测试传 MemorySaver。"""
+def build_graph(
+    *,
+    checkpointer: BaseCheckpointSaver | None = None,
+    llm=None,
+    llm_quiet=None,
+):
+    """构建对话主图。
+
+    llm：流式实例，供主力 agent（SSE 逐 token 转发）。
+    llm_quiet：非流式实例，供消解/意图兜底/知识生成——这些调用的中间
+    输出不能冒泡成 delta（见 app/llm.py get_llm_quiet）。
+    生产传 get_checkpointer()；测试传 MemorySaver。
+    """
 
     # ---------- 节点 ----------
 
@@ -66,7 +78,9 @@ def build_graph(*, checkpointer: BaseCheckpointSaver | None = None, llm=None):
                 "node_path": "resolve(skip)",
                 "turn_count": state.get("turn_count", 0) + 1,
             }
-        resolved = await resolve_reference(message, state.get("history", []), llm)
+        resolved = await resolve_reference(
+            message, state.get("history", []), llm_quiet or llm
+        )
         return {
             "resolved_query": resolved,
             "node_path": "resolve",
@@ -74,7 +88,7 @@ def build_graph(*, checkpointer: BaseCheckpointSaver | None = None, llm=None):
         }
 
     async def classify_node(state: ConversationState) -> dict:
-        result = await classify_intent(state["resolved_query"], llm)
+        result = await classify_intent(state["resolved_query"], llm_quiet or llm)
         return {
             "intent": result.intent,
             "intent_confidence": result.confidence,
@@ -86,7 +100,7 @@ def build_graph(*, checkpointer: BaseCheckpointSaver | None = None, llm=None):
 
     async def knowledge_node(state: ConversationState) -> dict:
         outcome = await run_knowledge_retrieval(
-            state["resolved_query"], state["visitor_id"], llm=llm
+            state["resolved_query"], state["visitor_id"], llm=llm_quiet or llm
         )
         update: dict[str, Any] = {
             "final_text": outcome.final_text,
@@ -102,13 +116,16 @@ def build_graph(*, checkpointer: BaseCheckpointSaver | None = None, llm=None):
 
     async def business_node(state: ConversationState) -> dict:
         result = await run_business_agent_with_limit(
-            {"messages": state.get("messages", []) or [("user", state["resolved_query"])]},
+            {"messages": [("user", state["resolved_query"])]},
+            visitor_id=state["visitor_id"],
             llm=llm,
         )
         return {
             "final_text": result["final_text"],
             "tool_calls": result["tool_calls"],
             "steps": result["steps"],
+            "total_tokens": result.get("total_tokens"),
+            "stopped_by": result["stopped_by"],
             "node_path": "business",
             "pending_topic": state["resolved_query"],
         }

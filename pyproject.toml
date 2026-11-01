@@ -17,6 +17,7 @@ dependencies = [
     "langgraph-checkpoint-mysql>=3.0.0",
     "langgraph-checkpoint-sqlite>=3.1.2",
     "aiomysql>=0.3.2",
+    "pymysql>=1.2.3",
 ]
 
 [dependency-groups]

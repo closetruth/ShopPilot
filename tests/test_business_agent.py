@@ -68,6 +68,7 @@ async def test_recursion_limit_stops_loop():
 
     result = await run_business_agent_with_limit(
         {"messages": [HumanMessage(content="查订单")]},
+        visitor_id="test-visitor",
         llm=_always_tool_llm(),
     )
     assert "人工" in result["final_text"]
