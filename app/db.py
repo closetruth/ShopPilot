@@ -32,6 +32,17 @@ CREATE TABLE IF NOT EXISTS messages (
         REFERENCES conversations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS conversation_summaries (
+    conversation_id VARCHAR(32)  NOT NULL PRIMARY KEY,
+    summary         TEXT         NOT NULL,
+    covered_until   BIGINT       NOT NULL,
+    token_count     INT          NOT NULL,
+    created_at      DATETIME(6)  NOT NULL,
+    updated_at      DATETIME(6)  NOT NULL,
+    CONSTRAINT fk_summaries_conv FOREIGN KEY (conversation_id)
+        REFERENCES conversations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS products (
     id          VARCHAR(32)   NOT NULL PRIMARY KEY,
     name        VARCHAR(128)  NOT NULL,

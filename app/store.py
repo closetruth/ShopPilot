@@ -22,8 +22,11 @@ __all__ = [
     "create_conversation",
     "conversation_owned_by",
     "load_history",
+    "load_history_after",
     "list_conversations",
     "append_message",
+    "get_summary",
+    "upsert_summary",
     # 商品
     "search_products",
     # 订单
@@ -59,8 +62,11 @@ __all__ = [
 create_conversation = chats.create_conversation
 conversation_owned_by = chats.conversation_owned_by
 load_history = chats.load_history
+load_history_after = chats.load_history_after
 list_conversations = chats.list_conversations
 append_message = chats.append_message
+get_summary = chats.get_summary
+upsert_summary = chats.upsert_summary
 
 # ---------- 商品 ----------
 
