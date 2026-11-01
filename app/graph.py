@@ -45,6 +45,10 @@ class ConversationState(TypedDict, total=False):
     steps: int
     total_tokens: int | None
     stopped_by: str | None
+    # r16 改写观测：词条与是否回退，供轨迹落库（数据飞轮）
+    rewritten_terms: list[str]
+    rewritten_query: str
+    fallback_used: bool
     # 本轮输入（消息/历史/访客身份/历史消息对象）。LangGraph 的 state 是
     # 「本轮全量输入+产出」的通道集合，这些字段每轮由 invoke 传入被覆盖、
     # 不跨轮累积；跨轮延续的只有上面几个工作槽位
@@ -106,6 +110,9 @@ def build_graph(
             "final_text": outcome.final_text,
             "top_score": outcome.max_score,
             "node_path": "knowledge",
+            "rewritten_terms": outcome.rewritten_terms,
+            "rewritten_query": outcome.rewritten_query,
+            "fallback_used": outcome.fallback_used,
         }
         if outcome.insufficient:
             update["pending_topic"] = ""

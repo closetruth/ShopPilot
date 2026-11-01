@@ -602,6 +602,14 @@ def _record_turn_trace(
     started: float,
 ) -> None:
     """把一轮对话的工作字段写入 agent_traces。"""
+    detail = None
+    if state.get("rewritten_terms"):
+        # r16 改写观测：数据飞轮分析词条命中与回退率
+        detail = {
+            "rewritten_terms": state["rewritten_terms"],
+            "rewritten_query": state.get("rewritten_query", ""),
+            "fallback_used": state.get("fallback_used", False),
+        }
     try:
         store.record_trace(
             conversation_id=conversation_id,
@@ -616,6 +624,7 @@ def _record_turn_trace(
             top_score=state.get("top_score"),
             tool_calls=state.get("tool_calls"),
             steps=state.get("steps"),
+            detail=detail,
         )
     except Exception:  # noqa: BLE001 - 轨迹是观测数据，失败不影响对话
         logger.warning("轨迹记录失败", exc_info=True)

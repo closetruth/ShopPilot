@@ -75,7 +75,7 @@ async def test_complaint_route(memory_graph):
 
 @pytest.mark.anyio
 async def test_knowledge_route(memory_graph, monkeypatch):
-    """知识类消息检索命中后带引用编号。"""
+    """知识类消息检索命中后带引用编号，改写观测字段进 state。"""
     _mock_vector(monkeypatch, [
         {"source_id": "P-RET-001-3", "score": 0.83, "text": "退回运费由消费者承担"}
     ])
@@ -87,6 +87,9 @@ async def test_knowledge_route(memory_graph, monkeypatch):
     )
     assert "[P-" in result["final_text"]
     assert "knowledge" in result["node_path"]
+    # r16：「退货运费谁出」无词条命中，观测字段应为空默认值
+    assert result["rewritten_terms"] == []
+    assert result["fallback_used"] is False
 
 
 @pytest.mark.anyio
