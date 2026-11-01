@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app import store
 from app.api._graph import get_graph
+from app.context_builder import build_context
 from app.llm import get_llm_quiet
 from app.schemas import WorkOrderCreate
 from app.tools import AgentContext
@@ -108,14 +109,17 @@ def _record_turn_trace(
     started: float,
 ) -> None:
     """把一轮对话的工作字段写入 agent_traces。"""
-    detail = None
+    detail = {}
     if state.get("rewritten_terms"):
         # r16 改写观测：数据飞轮分析词条命中与回退率
-        detail = {
-            "rewritten_terms": state["rewritten_terms"],
-            "rewritten_query": state.get("rewritten_query", ""),
-            "fallback_used": state.get("fallback_used", False),
-        }
+        detail["rewritten_terms"] = state["rewritten_terms"]
+        detail["rewritten_query"] = state.get("rewritten_query", "")
+        detail["fallback_used"] = state.get("fallback_used", False)
+    if state.get("context_budget"):
+        # r18 上下文账目：每轮的预算构成可观测
+        detail["budget"] = state["context_budget"]
+    if not detail:
+        detail = None
     try:
         store.record_trace(
             conversation_id=conversation_id,
@@ -149,8 +153,12 @@ async def chat(req: ChatRequest) -> StreamingResponse:
     ):
         conversation_id = store.create_conversation(req.visitor_id)
 
-    history_limit = int(os.getenv("HISTORY_LIMIT", "20"))
-    history = store.load_history(conversation_id, history_limit)
+    # r18：token 预算组装（梗概 + 预算内原文），本轮输入参与扣减
+    bundle = build_context(conversation_id, req.message)
+    history: list[dict] = []
+    if bundle.summary_text:
+        history.append({"role": "user", "content": f"【此前对话梗概】{bundle.summary_text}"})
+    history.extend(bundle.recent_messages)
     store.append_message(conversation_id, "user", req.message)
 
     async def stream():
@@ -217,6 +225,7 @@ async def chat(req: ChatRequest) -> StreamingResponse:
                 saved = True
 
             # 轨迹落库：观测数据，失败不影响对话（record_trace 自兜底）
+            values["context_budget"] = bundle.budget
             _record_turn_trace(
                 conversation_id, req.visitor_id, req.message, values, started
             )
@@ -230,12 +239,25 @@ async def chat(req: ChatRequest) -> StreamingResponse:
                 store.append_message(
                     conversation_id, "assistant", "".join(collected).strip()
                 )
+            # r18：原文超预算时后台异步压缩（不阻塞响应、失败下轮重评）
+            import asyncio
+
+            asyncio.create_task(_summarize_quietly(conversation_id))
 
     return StreamingResponse(
         stream(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+async def _summarize_quietly(conversation_id: str) -> None:
+    try:
+        from app.summarizer import maybe_summarize
+
+        await maybe_summarize(conversation_id)
+    except Exception:  # noqa: BLE001 - 后台任务任何异常都不外泄
+        logger.warning("后台摘要任务异常", exc_info=True)
 
 
 @router.get("/api/history")

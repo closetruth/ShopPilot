@@ -138,8 +138,14 @@ def build_graph(
         return update
 
     async def business_node(state: ConversationState) -> dict:
+        # r18 接线：梗概 + 预算内原文 + 本轮，作为完整对话历史给主力 agent。
+        # history 已由入口组装（首位可能是梗概条目），本轮消息放最后
+        messages = [
+            (m["role"], m["content"]) for m in state.get("history", [])
+        ]
+        messages.append(("user", state["resolved_query"]))
         result = await run_business_agent_with_limit(
-            {"messages": [("user", state["resolved_query"])]},
+            {"messages": messages},
             visitor_id=state["visitor_id"],
             llm=llm,
         )

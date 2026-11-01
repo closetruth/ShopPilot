@@ -93,3 +93,67 @@ def test_tool_event_forwarded(client):
         body = "".join(resp.iter_text())
     assert '"delta": "查到了您的订单"' in body
     assert body.rstrip().endswith("[DONE]")
+
+
+def test_business_agent_receives_context_messages(client):
+    """r18 接线：主力 agent 收到的 messages = 梗概（若有）+ 原文 + 本轮。"""
+    captured: list[list] = []
+
+    async def fake_run(inputs, *, visitor_id, llm=None):
+        captured.append(inputs["messages"])
+        return {
+            "final_text": "好的",
+            "stopped_by": None,
+            "tool_calls": [],
+            "steps": 1,
+            "total_tokens": None,
+        }
+
+    client.app.dependency_overrides.clear()
+    import langgraph.checkpoint.memory as mem
+    from langgraph.checkpoint.memory import MemorySaver
+
+    from app.api import _graph as graph_singleton
+    from app.graph import build_graph
+
+    # 重新打 runner patch（fixture 里的 fake_run 不捕获 messages）
+    import app.graph as graph_mod
+
+    graph_mod.run_business_agent_with_limit = fake_run
+    graph = build_graph(checkpointer=MemorySaver(), llm=None, llm_quiet=None)
+    graph_singleton._compiled_graph = graph
+
+    visitor_id = "ctx-r18"
+    with client.stream(
+        "POST",
+        "/api/chat",
+        json={"message": "我要查订单", "visitor_id": visitor_id},
+    ) as resp:
+        "".join(resp.iter_text())
+
+    assert captured, "business runner 应被调用"
+    msgs = captured[0]
+    # 本轮消息必须在最后
+    assert msgs[-1][1] == "我要查订单" or "查订单" in str(msgs[-1])
+    # r18：无梗概无历史时 messages 只有本轮一条；有梗概时首位是梗概条目
+    assert isinstance(msgs, list)
+
+
+def test_budget_recorded_in_trace(client):
+    """r18 可观测：每轮 trace 的 detail 带 budget 账目。"""
+    from app import store
+
+    visitor_id = "ctx-r18-budget"
+    with client.stream(
+        "POST",
+        "/api/chat",
+        json={"message": "你好", "visitor_id": visitor_id},
+    ) as resp:
+        "".join(resp.iter_text())
+
+    traces = [t for t in store.list_traces(limit=5) if t["visitor_id"] == visitor_id]
+    assert traces, "应有轨迹"
+    detail = traces[0].get("detail") or {}
+    assert "budget" in detail, f"detail 应含 budget，实际 {list(detail)}"
+    assert detail["budget"]["total"] > 0
+    assert "recent_tokens" in detail["budget"]
