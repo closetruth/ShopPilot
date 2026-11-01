@@ -28,6 +28,7 @@ uv run uvicorn app.main:app --reload
 | `MYSQL_USER` / `MYSQL_PASSWORD` | 数据库账号 | `shoppilot` / `shoppilot` |
 | `MYSQL_DATABASE` | 库名 | `shoppilot` |
 | `CHECKPOINT_BACKEND` | 会话状态 checkpoint 存储 | `mysql`（默认）/ `sqlite` |
+| `CONTEXT_WINDOW` | token 预算的模型窗口口径 | `8192`（紧凑，生产配真实窗口如 131072） |
 | `SILICONFLOW_API_KEY` | 嵌入服务密钥 | `sk-...` |
 | `EMBED_MODEL` | 嵌入模型 | `BAAI/bge-m3` |
 | `EMBED_BASE_URL` | 嵌入服务地址 | `https://api.siliconflow.cn/v1` |
@@ -154,6 +155,11 @@ SSE 事件：
 
 消息历史存 MySQL 消息表；图的会话工作状态（消解结果、意图、槽位、轮次）
 经 checkpoint 存同一 MySQL 库，跨进程续跑。
+
+上下文按 token 预算组装（`CONTEXT_WINDOW × 0.25`，减去 system/工具/
+输出余量）：梗概（水位线前历史的压缩，事实型、单表存储、后台异步生成）
++ 预算内原文窗口，一起接进主力 agent。原文超预算从最旧截断，梗概接续。
+每轮预算账目落 agent_traces，`GET /api/admin/context-usage` 可查。
 
 ## 工具
 
