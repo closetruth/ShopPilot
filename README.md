@@ -50,17 +50,22 @@ uv run pytest
 
 ```
 app/
-  main.py      FastAPI：SSE 对话、历史、会话列表、静态托管
+  main.py      服务装配：lifespan、路由挂载、静态托管（薄壳）
+  api/
+    customer.py  顾客侧：对话 SSE、历史、订单、工单、FAQ 详情
+    admin.py     管理侧：FAQ CRUD、批量导入、重建索引
+    _graph.py    对话图单例
   graph.py     StateGraph 组装：消解→意图→四路分流→日志
   agent.py     业务主力 agent（ReAct，业务四件工具，步数/token 上限）
   intent.py    意图分类：规则先行，LLM 兜底
   resolve.py   指代消解：代词/短消息按需触发
-  knowledge_node.py 知识检索节点：向量检索→0.65 置信度闸→生成回答
+  knowledge_node.py 知识检索节点：改写→检索→0.65 置信度闸→生成回答
+  query_rewrite.py  售后口语→政策术语的词表（意图售后词的单一代码源）
   templates.py 投诉/闲聊固定话术（零 LLM），投诉自动建工单
   tools.py     业务工具：查商品 / 查订单 / 查工单 / 起草工单
   checkpointer.py 会话工作状态 checkpoint（MySQL，SQLite 兜底）
   schemas.py   工具参数校验模型
-  llm.py       ChatOpenAI 工厂（OpenAI 兼容）
+  llm.py       ChatOpenAI 工厂（OpenAI 兼容；流式/非流式两个实例）
   embedding.py BGE-M3 嵌入（硅基流动）
   vector_store.py Milvus 索引与检索（仅 FAQ）
   db.py        MySQL 连接、建表、旧表补列
