@@ -73,6 +73,35 @@ async def admin_low_confidence(limit: int = 100) -> dict:
     }
 
 
+@router.get("/api/admin/context-usage")
+async def admin_context_usage(conversation_id: str, limit: int = 20) -> dict:
+    """上下文账目：最近几轮的预算构成（r18 可观测）。
+
+    从 agent_traces 的 detail 里还原，看每轮 system/工具/梗概/原文
+    各占多少、丢了多少条。
+    """
+    limit = max(1, min(limit, 100))
+    traces = store.list_traces(limit=100)
+    rows = []
+    for t in traces:
+        if t["conversation_id"] != conversation_id:
+            continue
+        detail = t.get("detail") or {}
+        if "budget" not in detail:
+            continue
+        rows.append(
+            {
+                "created_at": t["created_at"],
+                "intent": t["intent"],
+                "message": t["message"][:50],
+                "budget": detail["budget"],
+            }
+        )
+        if len(rows) >= limit:
+            break
+    return {"conversation_id": conversation_id, "turns": rows}
+
+
 @router.get("/api/admin/faq/search")
 async def admin_debug_search(q: str, top_k: int = 5) -> dict:
     """调试用：查看检索原始分数，绕过阈值过滤。
