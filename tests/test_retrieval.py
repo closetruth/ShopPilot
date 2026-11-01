@@ -78,19 +78,18 @@ async def test_search_finds_the_right_policy(indexed_faq, question, expected_doc
 
 
 @pytest.mark.anyio
-async def test_borderline_complaint_is_rejected(indexed_faq):
-    """「要投诉你们的服务」得分 0.63，落在检索阈值与拒答阈值之间。
+async def test_borderline_complaint_now_hits_complaint_policy(indexed_faq):
+    """「要投诉你们的服务」r14 曾冻结为必须拒答（0.63 落在闸下）。
 
-    r14 把证据充分性阈值升到 0.65 后，这条被判定为证据不足而拒答。
-    这是可接受的取舍：投诉本来就该转人工而非引用条款；但要在测试里
-    明确固化这个行为，防止将来调阈值时无意识地来回变化。
-
-    它同时暴露了阈值方法本身的局限——0.63（投诉）与 0.657（买一送一）
-    之间没有可靠的分界线，详见 docs/dev-notes/r14.md 的遗留问题。
+    r16 词表改写后追加「投诉处理原则 转人工」，实测 0.812 命中投诉
+    升级与人工转接条款——用户裁定接受新行为：口语投诉措辞由知识路径
+    给出投诉处理原则 + 转人工指引，比生硬拒答更合理。意图分流不变
+    （规则判 complaint 的仍走模板），本测试只钉检索节点的行为。
     """
     results = await _search("要投诉你们的服务")
-    assert results == [], (
-        f"阈值 0.65 下「要投诉」应被拒答，实际返回 {[r['title'] for r in results]}"
+    assert results, "r16 改写后应命中投诉处理条款"
+    assert any("投诉" in r["title"] or "投诉" in r["section"] for r in results), (
+        [f"{r['title']}/{r['section']}" for r in results]
     )
 
 

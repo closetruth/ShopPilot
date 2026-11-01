@@ -14,6 +14,7 @@ import logging
 from dataclasses import dataclass, field
 
 from app import store, vector_store
+from app.query_rewrite import rewrite_query
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,10 @@ class KnowledgeOutcome:
 
     final_text 是直接可发给顾客的文本；insufficient 为 true 时它就是
     拒答话术，此时 hits / cited_ids 恒为空。
+
+    r16 改写相关：rewritten_terms 是命中词条（空=未改写），
+    rewritten_query 是实际用于检索的最终 query，fallback_used 表示
+    改写证据不足后回退用原话重查。
     """
 
     final_text: str
@@ -45,6 +50,9 @@ class KnowledgeOutcome:
     insufficient: bool = False
     max_score: float = 0.0
     cited_ids: list[str] = field(default_factory=list)
+    rewritten_terms: list[str] = field(default_factory=list)
+    rewritten_query: str = ""
+    fallback_used: bool = False
 
 
 # 生成 final_text 的一次轻量调用：输入命中资料 + r14 的引用与拒答规则。
@@ -65,27 +73,50 @@ ANSWER_PROMPT = """你是店铺客服。根据下面的知识资料回答顾客�
 async def run_knowledge_retrieval(
     resolved_query: str, visitor_id: str, *, llm=None
 ) -> KnowledgeOutcome:
-    """检索 → 置信度闸 → 生成 final_text。
+    """改写 → 检索 → 置信度闸（不足回退原话）→ 生成 final_text。
 
     llm 为 None 时不调模型，final_text 直接由资料原文拼接（图组装时传入
     主 LLM；测试或降级场景可省略）。
     """
-    top_k = 3
-    # 嵌入是同步 HTTP 调用，整个 search（嵌入+查询）放进线程池执行，
-    # 避免阻塞事件循环
     import anyio
 
+    rewritten_query, terms = rewrite_query(resolved_query)
+    top_k = 3
+
+    # 嵌入是同步 HTTP 调用，整个 search（嵌入+查询）放进线程池执行，
+    # 避免阻塞事件循环
     hits = await anyio.to_thread.run_sync(
-        lambda: vector_store.search(resolved_query, "", top_k=top_k)
+        lambda: vector_store.search(rewritten_query, "", top_k=top_k)
     )
     hits = sorted(hits, key=lambda h: h["score"], reverse=True)[:top_k]
-
     max_score = hits[0]["score"] if hits else 0.0
+
+    fallback_used = False
+    if (
+        terms
+        and not hits
+        or (terms and max_score < INSUFFICIENT_THRESHOLD)
+    ):
+        # 改写可能带偏（词表术语把命中拉向错误条款）：原话回退重查一次，
+        # 取分数更高的一组——保证改写不比现状差
+        orig_hits = await anyio.to_thread.run_sync(
+            lambda: vector_store.search(resolved_query, "", top_k=top_k)
+        )
+        orig_hits = sorted(orig_hits, key=lambda h: h["score"], reverse=True)[:top_k]
+        orig_max = orig_hits[0]["score"] if orig_hits else 0.0
+        if orig_max > max_score:
+            hits, max_score = orig_hits, orig_max
+            fallback_used = True
 
     if not hits:
         _record_low_confidence(visitor_id, resolved_query, "empty", None, [])
         return KnowledgeOutcome(
-            final_text=REFUSAL_TEMPLATE, insufficient=True, max_score=0.0
+            final_text=REFUSAL_TEMPLATE,
+            insufficient=True,
+            max_score=0.0,
+            rewritten_terms=terms,
+            rewritten_query=rewritten_query,
+            fallback_used=fallback_used,
         )
 
     if max_score < INSUFFICIENT_THRESHOLD:
@@ -94,7 +125,12 @@ async def run_knowledge_retrieval(
             [h["source_id"] for h in hits],
         )
         return KnowledgeOutcome(
-            final_text=REFUSAL_TEMPLATE, insufficient=True, max_score=max_score
+            final_text=REFUSAL_TEMPLATE,
+            insufficient=True,
+            max_score=max_score,
+            rewritten_terms=terms,
+            rewritten_query=rewritten_query,
+            fallback_used=fallback_used,
         )
 
     # 内容一律取自 MySQL 原文：向量库里存的是为检索拼接、可能被截断的文本
@@ -123,7 +159,12 @@ async def run_knowledge_retrieval(
             [h["source_id"] for h in hits],
         )
         return KnowledgeOutcome(
-            final_text=REFUSAL_TEMPLATE, insufficient=True, max_score=max_score
+            final_text=REFUSAL_TEMPLATE,
+            insufficient=True,
+            max_score=max_score,
+            rewritten_terms=terms,
+            rewritten_query=rewritten_query,
+            fallback_used=fallback_used,
         )
 
     final_text = await _compose_answer(resolved_query, results, llm)
@@ -133,6 +174,9 @@ async def run_knowledge_retrieval(
         insufficient=False,
         max_score=max_score,
         cited_ids=[r["faq_id"] for r in results],
+        rewritten_terms=terms,
+        rewritten_query=rewritten_query,
+        fallback_used=fallback_used,
     )
 
 

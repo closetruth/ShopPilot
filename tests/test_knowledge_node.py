@@ -102,4 +102,61 @@ async def test_llm_failure_falls_back_to_sources(indexed_faq):
     assert not out.insufficient
     assert out.cited_ids
     assert "[P-" in out.final_text
+
+
+# ---------- r16：query 改写与回退 ----------
+
+
+@pytest.mark.anyio
+async def test_rewrite_boosts_colloquial_query(indexed_faq):
+    """口语 query 走改写：物流延迟类从被挡到命中补偿条款。"""
+    out = await run_knowledge_retrieval(
+        "快递好久没动", "kn-rewrite", llm=None
+    )
+    assert out.rewritten_terms, "应触发物流延迟词条"
+    assert not out.insufficient, f"改写后仍拒答：max_score={out.max_score}"
+    assert any("补偿" in r["section"] or "延迟" in r["section"] for r in out.hits)
+
+
+@pytest.mark.anyio
+async def test_fallback_to_original_when_rewrite_insufficient(indexed_faq, monkeypatch):
+    """改写后证据不足 → 用原话回退重查，取分高的一组。
+
+    mock 词表强制触发一个「坏」词条，让改写必然发生；再 mock 检索让
+    改写 query 分数低于原话，验证回退选中了原话那组。
+    """
+    from app import vector_store
+
+    calls: list[str] = []
+
+    def fake_search(query, visitor_id, top_k=3):
+        calls.append(query)
+        if "质量问题" in query:
+            # 改写后的 query 反而更低分（模拟词表带偏）
+            return [{"source_id": "P-RET-001-1", "score": 0.55, "text": "x"}]
+        return [{"source_id": "P-RET-001-2", "score": 0.80, "text": "x"}]
+
+    monkeypatch.setattr(vector_store, "search", fake_search)
+    monkeypatch.setattr(
+        "app.knowledge_node.rewrite_query",
+        lambda q: (f"{q} 质量问题", ["质量问题"]),
+    )
+
+    out = await run_knowledge_retrieval("我那订单", "kn-fallback", llm=None)
+    assert out.fallback_used is True
+    assert not out.insufficient
+    assert out.max_score == 0.80, "应取原话那组（分数更高）"
+    assert len(calls) == 2, f"应检索两次（改写+原话），实际 {calls}"
+
+
+@pytest.mark.anyio
+async def test_no_rewrite_for_clean_query(indexed_faq):
+    """无词条命中的 query 行为不变：不触发改写也不触发回退。"""
+    out = await run_knowledge_retrieval(
+        "退货的运费谁出", "kn-clean", llm=None
+    )
+    assert out.rewritten_terms == []
+    assert out.rewritten_query == "退货的运费谁出"
+    assert out.fallback_used is False
+    assert not out.insufficient
     assert "运费" in out.final_text
