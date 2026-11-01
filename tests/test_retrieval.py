@@ -78,6 +78,55 @@ async def test_search_finds_the_right_policy(indexed_faq, question, expected_doc
 
 
 @pytest.mark.anyio
+async def test_colloquial_queries_reach_the_right_policy(indexed_faq):
+    """r16 核心：口语措辞经词表改写后能命中正确条款。
+
+    这些 query 在改写前分数 0.55-0.62，横跨 0.65 拒答闸被挡——
+    词表的意义就是把「措辞问题」在措辞层解决，而不是调阈值。
+    """
+    cases = [
+        ("快递好久没动", "P-LOG-001"),      # 0.619 → 0.771，补偿标准
+        ("东西坏了想退", "P-REF-002"),      # 0.675 → 0.75，质量问题退换货
+        ("七天了还能退吗", "P-RET-001"),    # 0.748 → 0.83
+    ]
+    for question, expected_doc in cases:
+        results = await _search(question)
+        assert results, f"「{question}」改写后仍未检出"
+        doc_ids = [r["doc_id"] for r in results]
+        assert expected_doc in doc_ids, (
+            f"口语「{question}」期望 {expected_doc}，实际 {doc_ids}"
+        )
+
+
+@pytest.mark.anyio
+async def test_packaging_broken_improves_but_may_still_refuse(indexed_faq):
+    """「包装破了」设计阶段实测 0.553 → 0.643（旧术语「运输破损 商品完好」）。
+
+    术语调整为「破损 质量问题退换货」（与 FAQ 原文对齐，术语存在性
+    测试要求的）后实测 0.683——过了拒答闸，命中 P-REF-002 质量问题
+    退换货，语义正确。用户裁定原是「不为单条硬调、可能仍拒答」，词条
+    对齐术语后顺带过闸，测试固化实际行为：显著提升 + 命中质量问题
+    退换货方向。
+    """
+    from app import vector_store
+    from app.query_rewrite import rewrite_query
+
+    base = vector_store.search("包装破了", "", top_k=1)
+    base_score = base[0]["score"] if base else 0.0
+    rewritten, terms = rewrite_query("包装破了")
+    assert terms, "应命中破损词条"
+
+    out = await run_knowledge_retrieval("包装破了", "test-visitor", llm=None)
+    assert out.max_score >= base_score + 0.05, (
+        f"改写后 {out.max_score:.3f}，原话 {base_score:.3f}，提升不足 0.05"
+    )
+    assert not out.insufficient, f"实测应过闸：{out.max_score:.3f}"
+    assert any("质量" in r["section"] or "退换货" in r["title"] for r in out.hits), (
+        [f"{r['title']}/{r['section']}" for r in out.hits]
+    )
+
+
+@pytest.mark.anyio
 async def test_borderline_complaint_now_hits_complaint_policy(indexed_faq):
     """「要投诉你们的服务」r14 曾冻结为必须拒答（0.63 落在闸下）。
 
