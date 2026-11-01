@@ -54,6 +54,25 @@ def test_rule_hits(query, expected_term):
     assert any(expected_term in t for t in terms), f"「{query}」应命中含「{expected_term}」的词条"
 
 
+def test_aftersale_projection_matches_wordlist():
+    """r17 单一来源守卫：意图层的售后词与词表 aftersale 规则同步。
+
+    aftersale 规则里的每个触发分支都必须被派生正则命中——将来有人
+    改了词表忘了派生逻辑（或反过来），这条会红。
+    """
+    from app.query_rewrite import REWRITE_RULES, aftersale_pattern
+
+    pattern = aftersale_pattern()
+    for rule in REWRITE_RULES:
+        if not rule.aftersale:
+            continue
+        # 每个触发分支取一个代表词验证
+        for branch in rule.pattern.pattern.split("|"):
+            assert pattern.search(f"测试{branch}用例"), (
+                f"规则「{rule.name}」的触发词「{branch}」未进入意图派生正则"
+            )
+
+
 @pytest.mark.skipif(
     not os.getenv("SILICONFLOW_API_KEY", "").strip(),
     reason="未配置 SILICONFLOW_API_KEY",
@@ -66,8 +85,8 @@ def test_terms_exist_in_faq_content():
     corpus = "\n".join(
         f"{r['title']} {r['section']} {r['content']}" for r in store.list_faq()
     )
-    for _, terms in REWRITE_RULES:
-        for term in terms.split():
+    for rule in REWRITE_RULES:
+        for term in rule.terms.split():
             assert term in corpus, f"术语「{term}」在 FAQ 全文中不存在，词表与条款脱节"
 
 

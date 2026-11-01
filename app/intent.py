@@ -19,6 +19,8 @@ import logging
 import re
 from dataclasses import dataclass
 
+from app.query_rewrite import aftersale_pattern
+
 logger = logging.getLogger(__name__)
 
 # LLM 兜底的置信度阈值：低于它按业务数据处理（宁可多问，不可漏单）
@@ -73,12 +75,9 @@ _KNOWLEDGE_QUESTION_RE = re.compile(
 
 # 售后诉求描述词：商品/包装/物流出状况的客观陈述，是售后问题不是投诉
 # 或查件。LLM 兜底会把「包装破了」判成投诉（0.75）、「快递好久没动」
-# 判成查订单（business）——这类词在投诉规则之后、业务/知识规则之前
-# 直接钉进 knowledge
-_AFTERSALE_RE = re.compile(
-    r"坏了|破了|破损|摔坏|压坏|漏了|开裂|掉漆|失灵|用不了|"
-    r"没动静|没更新|没动|不动了|迟迟不到|太慢了|丢件|没收到货"
-)
+# 判成查订单（business）——词表唯一来源在 app/query_rewrite.py 的
+# aftersale 规则，这里派生引用，两处永不漂移
+_AFTERSALE_RE = aftersale_pattern()
 
 
 def classify_by_rules(message: str) -> tuple[str, bool]:
