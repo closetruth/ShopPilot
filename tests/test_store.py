@@ -21,13 +21,15 @@ def test_create_and_ownership(visitor):
 
 def test_append_and_load(visitor):
     conv_id = store.create_conversation(visitor)
-    store.append_message(conv_id, "user", "你好")
-    store.append_message(conv_id, "assistant", "您好")
+    user_id = store.append_message(conv_id, "user", "你好")
+    assistant_id = store.append_message(conv_id, "assistant", "您好")
 
     assert store.load_history(conv_id) == [
-        {"role": "user", "content": "你好"},
-        {"role": "assistant", "content": "您好"},
+        {"role": "user", "content": "你好", "id": user_id},
+        {"role": "assistant", "content": "您好", "id": assistant_id},
     ]
+    # 返回 id 是反馈的锚点，必须大于 0
+    assert user_id > 0 and assistant_id > user_id
 
 
 def test_load_history_limit_keeps_latest_in_order(visitor):

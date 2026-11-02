@@ -26,11 +26,11 @@ def conversation_owned_by(conversation_id: str, visitor_id: str) -> bool:
         return cur.fetchone() is not None
 
 
-def load_history(conversation_id: str, limit: int = 20) -> list[dict[str, str]]:
+def load_history(conversation_id: str, limit: int = 20) -> list[dict]:
     with connect() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            SELECT role, content FROM (
+            SELECT role, content, id FROM (
                 SELECT role, content, id FROM messages
                  WHERE conversation_id = %s
                  ORDER BY id DESC
@@ -40,7 +40,7 @@ def load_history(conversation_id: str, limit: int = 20) -> list[dict[str, str]]:
             (conversation_id, limit),
         )
         rows = cur.fetchall()
-    return [{"role": r["role"], "content": r["content"]} for r in rows]
+    return [{"role": r["role"], "content": r["content"], "id": r["id"]} for r in rows]
 
 
 def list_conversations(visitor_id: str) -> list[dict]:
@@ -74,13 +74,15 @@ def list_conversations(visitor_id: str) -> list[dict]:
     ]
 
 
-def append_message(conversation_id: str, role: str, content: str) -> None:
+def append_message(conversation_id: str, role: str, content: str) -> int:
+    """返回新消息 id：反馈要绑到具体某条回答，前端靠它定位。"""
     with connect() as conn, conn.cursor() as cur:
         cur.execute(
             "INSERT INTO messages (conversation_id, role, content, created_at)"
             " VALUES (%s, %s, %s, %s)",
             (conversation_id, role, content, now()),
         )
+        return cur.lastrowid
 
 
 # ---------- 梗概（r18） ----------

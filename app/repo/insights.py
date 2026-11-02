@@ -64,6 +64,24 @@ def list_recent(limit: int = 100) -> list[dict]:
     ]
 
 
+def low_confidence_by_id(row_id: int) -> dict | None:
+    """按 id 取一条低置信度记录，转评估样本时用。"""
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, visitor_id, query, max_score, result_count, reason,
+                   retrieved, created_at
+              FROM low_confidence_queries
+             WHERE id = %s
+            """,
+            (row_id,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    return {**row, "created_at": row["created_at"].isoformat()}
+
+
 def stats() -> dict:
     """按原因分组统计，看缺口主要集中在哪类。"""
     with connect() as conn, conn.cursor() as cur:

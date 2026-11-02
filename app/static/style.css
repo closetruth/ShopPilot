@@ -193,6 +193,92 @@ html, body {
   color: var(--error);
 }
 
+/* ---------- 反馈 ---------- */
+
+.row.bot:has(.fb-bar) {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.fb-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.fb-btn {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.fb-btn:hover { background: var(--hover); }
+.fb-btn.active { border-color: var(--user); background: var(--active); }
+
+.fb-note { font-size: 12px; color: var(--muted); }
+
+.fb-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fb-panel[hidden] { display: none; }
+
+.fb-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fb-chip {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.fb-chip:hover { background: var(--hover); }
+
+.fb-chip.active {
+  border-color: var(--user);
+  background: var(--active);
+  color: var(--user);
+}
+
+.fb-submit { align-self: flex-start; }
+
+.fb-comment {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--panel);
+}
+
+.fb-comment:focus {
+  outline: none;
+  border-color: var(--user);
+}
+
 .bubble.streaming::after {
   content: "";
   display: inline-block;

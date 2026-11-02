@@ -63,6 +63,8 @@ class _Observability(TypedDict, total=False):
     rewritten_terms: list[str]
     rewritten_query: str
     fallback_used: bool
+    # r20 评估观测：知识节点是否判为「查不到」，拒答样本靠它打分
+    insufficient: bool
 
 
 # 多继承只做代码组织：LangGraph 按 __annotations__ 解析 schema，合并后
@@ -129,6 +131,7 @@ def build_graph(
             "rewritten_terms": outcome.rewritten_terms,
             "rewritten_query": outcome.rewritten_query,
             "fallback_used": outcome.fallback_used,
+            "insufficient": outcome.insufficient,
         }
         if outcome.insufficient:
             update["pending_topic"] = ""

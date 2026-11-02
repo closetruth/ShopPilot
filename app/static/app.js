@@ -142,6 +142,174 @@ function renderGreeting() {
   addRow("bot", "您好，我是店铺客服。请问有什么可以帮您？");
 }
 
+/* ---------- 反馈 ---------- */
+
+const FEEDBACK_REASONS = [
+  ["irrelevant", "答非所问"],
+  ["inaccurate", "信息不准确"],
+  ["unsolved", "没解决"],
+  ["verbose", "太啰嗦"],
+  ["other", "其他"],
+];
+
+async function postFeedback(messageId, rating, reason, comment) {
+  const res = await fetch("/api/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message_id: messageId,
+      visitor_id: session.visitor_id,
+      rating,
+      reason: reason || null,
+      comment: comment || null,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || "HTTP " + res.status);
+  return data;
+}
+
+async function fetchFeedbackMap(conversationId) {
+  const map = {};
+  if (!conversationId) return map;
+  try {
+    const res = await fetch(
+      "/api/feedback?conversation_id=" +
+        encodeURIComponent(conversationId) +
+        "&visitor_id=" +
+        encodeURIComponent(session.visitor_id)
+    );
+    if (!res.ok) return map;
+    const data = await res.json();
+    for (const it of data.items) map[it.message_id] = it;
+  } catch {
+    /* 回填失败不影响对话 */
+  }
+  return map;
+}
+
+/**
+ * 回答下方的赞踩条。
+ *
+ * 标签与文字都可选：点踩立即提交最小信息（rating=-1），再按需补标签与文字，
+ * 每次都是对同一条记录覆盖写；同方向再点一次撤销。
+ */
+function attachFeedback(row, messageId, existing) {
+  if (row.querySelector(".fb-bar")) return;
+  const state = {
+    rating: existing ? existing.rating : 0,
+    reason: (existing && existing.reason) || "",
+    comment: (existing && existing.comment) || "",
+  };
+
+  const bar = document.createElement("div");
+  bar.className = "fb-bar";
+
+  const up = document.createElement("button");
+  up.type = "button";
+  up.className = "fb-btn";
+  up.textContent = "👍";
+  up.title = "有帮助";
+
+  const down = document.createElement("button");
+  down.type = "button";
+  down.className = "fb-btn";
+  down.textContent = "👎";
+  down.title = "没帮助";
+
+  const note = document.createElement("span");
+  note.className = "fb-note";
+
+  const panel = document.createElement("div");
+  panel.className = "fb-panel";
+  panel.hidden = true;
+  bar.append(up, down, note, panel);
+  row.appendChild(bar);
+
+  const reasonRow = document.createElement("div");
+  reasonRow.className = "fb-reasons";
+  const chips = {};
+  for (const [code, label] of FEEDBACK_REASONS) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "fb-chip";
+    chip.textContent = label;
+    chip.addEventListener("click", () => submit({ rating: -1, reason: code }));
+    chips[code] = chip;
+    reasonRow.appendChild(chip);
+  }
+
+  const comment = document.createElement("textarea");
+  comment.className = "fb-comment";
+  comment.rows = 2;
+  comment.maxLength = 500;
+  comment.placeholder = "补充说明（可选）";
+  comment.value = state.comment;
+
+  const submitBtn = document.createElement("button");
+  submitBtn.type = "button";
+  submitBtn.className = "fb-chip fb-submit";
+  submitBtn.textContent = "提交";
+  submitBtn.addEventListener("click", () =>
+    submit({
+      rating: -1,
+      reason: state.reason || null,
+      comment: comment.value.trim() || null,
+    })
+  );
+  panel.append(reasonRow, comment, submitBtn);
+
+  function paint() {
+    up.classList.toggle("active", state.rating === 1);
+    down.classList.toggle("active", state.rating === -1);
+    panel.hidden = state.rating !== -1;
+    for (const [code, chip] of Object.entries(chips)) {
+      chip.classList.toggle("active", state.reason === code);
+    }
+    note.textContent = state.rating ? "已收到反馈" : "";
+  }
+
+  async function submit(patch) {
+    const before = { ...state };
+    Object.assign(state, patch);
+    paint();
+    try {
+      if (state.rating === 0) {
+        await postFeedback(messageId, 0);
+        state.reason = "";
+        state.comment = "";
+        comment.value = "";
+      } else {
+        await postFeedback(
+          messageId,
+          state.rating,
+          state.reason || null,
+          state.comment || null
+        );
+        if (state.rating === 1) {
+          state.reason = "";
+          state.comment = "";
+          comment.value = "";
+        }
+      }
+      paint();
+    } catch {
+      Object.assign(state, before);
+      paint();
+      note.textContent = "提交失败，请稍后重试";
+    }
+  }
+
+  up.addEventListener("click", () =>
+    submit({ rating: state.rating === 1 ? 0 : 1, reason: null, comment: null })
+  );
+  down.addEventListener("click", () =>
+    submit({ rating: state.rating === -1 ? 0 : -1 })
+  );
+
+  paint();
+}
+
 /* ---------- 工单 ---------- */
 
 const STATUS_CLASS = {
@@ -728,10 +896,14 @@ async function loadHistory() {
       renderGreeting();
       return;
     }
+    const feedbackMap = await fetchFeedbackMap(conversationId);
     for (const m of data.messages) {
-      const { bubble } = addRow(m.role === "user" ? "me" : "bot");
+      const { row, bubble } = addRow(m.role === "user" ? "me" : "bot");
       if (m.role === "user") bubble.textContent = m.content;
-      else renderCitations(bubble, m.content);
+      else {
+        renderCitations(bubble, m.content);
+        if (m.id) attachFeedback(row, m.id, feedbackMap[m.id]);
+      }
     }
   } catch {
     renderGreeting();
@@ -794,6 +966,7 @@ async function send(text) {
   let acc = "";
   let failed = false;
   let createdNew = false;
+  let messageId = null;
 
   try {
     const res = await fetch("/api/chat", {
@@ -839,6 +1012,8 @@ async function send(text) {
           if (!conversationId) createdNew = true;
           conversationId = msg.conversation_id;
           saveSession();
+        } else if (msg.message_id) {
+          messageId = msg.message_id;
         } else if (msg.pending_action) {
           renderPendingCard(msg.pending_action);
         } else if (msg.tool) {
@@ -870,6 +1045,7 @@ async function send(text) {
     toolHint.hidden = true;
     if (!acc && !failed) setText(bubble, "（无回复）");
     else if (acc) renderCitations(bubble, acc);
+    if (messageId && !failed) attachFeedback(row, messageId);
     busy = false;
     sendEl.disabled = false;
     setStatus("在线");

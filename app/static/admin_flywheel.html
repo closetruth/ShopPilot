@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据飞轮 · ShopPilot</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body class="admin-body">
+  <div class="admin">
+    <header class="admin-head">
+      <h1>数据飞轮</h1>
+      <div class="admin-actions">
+        <span class="admin-count" id="fwUpdated"></span>
+        <button class="btn" id="fwRefresh" type="button">刷新</button>
+        <a class="btn btn-link" href="/admin">知识库管理</a>
+        <a class="btn btn-link" href="/admin/tools">工具审计</a>
+        <a class="btn btn-link" href="/">返回对话</a>
+      </div>
+    </header>
+
+    <main class="admin-main fw-main">
+      <section class="fw-block">
+        <h2>反馈</h2>
+        <div class="fw-body" id="fwFeedback"></div>
+      </section>
+      <section class="fw-block">
+        <h2>成本</h2>
+        <div class="fw-body" id="fwCost"></div>
+      </section>
+      <section class="fw-block">
+        <h2>评估</h2>
+        <div class="fw-body" id="fwEval"></div>
+      </section>
+      <section class="fw-block">
+        <h2>样本</h2>
+        <div class="fw-body" id="fwCases"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/admin_flywheel.js"></script>
+</body>
+</html>

@@ -9,6 +9,7 @@ r15 起主力 agent 只处理业务数据类意图（知识检索收归图的知
 from __future__ import annotations
 
 import logging
+import os
 
 from langchain_core.messages import AIMessage
 from langgraph.errors import GraphRecursionError
@@ -20,8 +21,9 @@ logger = logging.getLogger(__name__)
 
 # 设计文档定值：步数上限走 LangGraph recursion_limit；token 上限含
 # 输入+输出累计，触线即中断。工具结果反复变大时 token 会先于步数触线。
+# token 上限读 env，便于按环境压测降级，不用改代码。
 STEP_LIMIT = 15
-TOKEN_LIMIT = 8000
+TOKEN_LIMIT = int(os.getenv("TURN_TOKEN_LIMIT", "8000") or 8000)
 
 LIMIT_FALLBACK_TEXT = "这个问题比较复杂，我帮你转人工处理。"
 

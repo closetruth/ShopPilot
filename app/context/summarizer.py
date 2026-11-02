@@ -87,9 +87,23 @@ async def maybe_summarize(conversation_id: str, *, llm=None) -> dict | None:
 
         llm = get_llm_quiet()
 
+    # 后台摘要单独计量：成本看板要能区分「对话」与「后台」开销
+    from app.observability.usage import build_usage_handler
+
+    config = {
+        "callbacks": [
+            build_usage_handler(conversation_id=conversation_id, source="bg")
+        ],
+        "metadata": {
+            "shoppilot_source": "bg",
+            "shoppilot_conversation_id": conversation_id,
+        },
+    }
+
     try:
         response = await llm.ainvoke(
-            [{"role": "user", "content": SUMMARY_PROMPT.format(dialog=dialog, tighten=tighten)}]
+            [{"role": "user", "content": SUMMARY_PROMPT.format(dialog=dialog, tighten=tighten)}],
+            config=config,
         )
         content = response.content
         text = content if isinstance(content, str) else str(content)

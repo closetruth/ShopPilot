@@ -62,8 +62,8 @@ def test_load_history_full_ignores_watermark(conv_id):
 
 def test_messages_table_unaffected(conv_id):
     """upsert 梗概不写原始消息表——原文表保持逐字事实。"""
-    store.append_message(conv_id, "user", "原文一条")
+    msg_id = store.append_message(conv_id, "user", "原文一条")
     store.upsert_summary(conv_id, "梗概文本", covered_until=10**9, token_count=4)
 
     rows = store.load_history(conv_id, limit=20)
-    assert rows == [{"role": "user", "content": "原文一条"}]
+    assert rows == [{"role": "user", "content": "原文一条", "id": msg_id}]

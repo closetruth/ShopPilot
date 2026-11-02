@@ -179,6 +179,95 @@ CREATE TABLE IF NOT EXISTS pending_actions (
     KEY idx_pending_visitor (visitor_id, created_at),
     KEY idx_pending_status (status, expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS message_feedback (
+    id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    message_id      BIGINT       NOT NULL,
+    conversation_id VARCHAR(32)  NOT NULL,
+    visitor_id      VARCHAR(64)  NOT NULL,
+    rating          TINYINT      NOT NULL,
+    reason          VARCHAR(32)  NULL,
+    comment         VARCHAR(500) NULL,
+    created_at      DATETIME(6)  NOT NULL,
+    updated_at      DATETIME(6)  NOT NULL,
+    UNIQUE KEY uk_feedback_message (message_id),
+    KEY idx_feedback_conv (conversation_id, created_at),
+    KEY idx_feedback_rating (rating, created_at),
+    KEY idx_feedback_visitor (visitor_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS llm_usage (
+    id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    conversation_id VARCHAR(32)  NULL,
+    visitor_id      VARCHAR(64)  NULL,
+    source          VARCHAR(16)  NOT NULL,
+    node            VARCHAR(32)  NOT NULL,
+    model           VARCHAR(64)  NOT NULL,
+    input_tokens    INT          NOT NULL DEFAULT 0,
+    output_tokens   INT          NOT NULL DEFAULT 0,
+    cost_micros     INT          NOT NULL DEFAULT 0,
+    latency_ms      INT          NULL,
+    created_at      DATETIME(6)  NOT NULL,
+    KEY idx_usage_conv (conversation_id, created_at),
+    KEY idx_usage_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS budget_events (
+    id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    scope           VARCHAR(16)  NOT NULL,
+    reason          VARCHAR(32)  NOT NULL,
+    conversation_id VARCHAR(32)  NULL,
+    visitor_id      VARCHAR(64)  NULL,
+    detail          VARCHAR(255) NULL,
+    created_at      DATETIME(6)  NOT NULL,
+    KEY idx_budget_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS eval_cases (
+    id                BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    query             TEXT         NOT NULL,
+    expected_intent   VARCHAR(32)  NULL,
+    expected_doc_ids  JSON         NULL,
+    expected_behavior VARCHAR(16)  NOT NULL DEFAULT 'answer',
+    source            VARCHAR(16)  NOT NULL,
+    source_ref        VARCHAR(64)  NULL,
+    status            VARCHAR(16)  NOT NULL DEFAULT 'candidate',
+    note              VARCHAR(255) NULL,
+    created_at        DATETIME(6)  NOT NULL,
+    updated_at        DATETIME(6)  NOT NULL,
+    KEY idx_eval_cases_status (status, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS eval_runs (
+    run_id       VARCHAR(32)  NOT NULL PRIMARY KEY,
+    sample_size  INT          NOT NULL,
+    config_json  JSON         NULL,
+    metrics_json JSON         NULL,
+    report_path  VARCHAR(255) NULL,
+    status       VARCHAR(16)  NOT NULL,
+    error        VARCHAR(255) NULL,
+    started_at   DATETIME(6)  NOT NULL,
+    finished_at  DATETIME(6)  NULL,
+    KEY idx_eval_runs_started (started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS eval_run_items (
+    id          BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    run_id      VARCHAR(32)  NOT NULL,
+    case_id     BIGINT       NOT NULL,
+    query       TEXT         NOT NULL,
+    intent      VARCHAR(32)  NULL,
+    answer      MEDIUMTEXT   NULL,
+    cited_ids   JSON         NULL,
+    passed      TINYINT      NOT NULL DEFAULT 0,
+    refused     TINYINT      NOT NULL DEFAULT 0,
+    checks_json JSON         NULL,
+    latency_ms  INT          NULL,
+    cost_micros INT          NULL,
+    error       VARCHAR(255) NULL,
+    created_at  DATETIME(6)  NOT NULL,
+    KEY idx_eval_items_run (run_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """
 
 

@@ -12,10 +12,11 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api import admin, customer
+from app.api import admin, customer, eval_cases, feedback, flywheel
 from app.api._graph import get_graph
 from app.core import store
 from app.core.llm import ConfigError, get_llm, get_llm_quiet
+from app.observability import langfuse
 from app.tools import mcp
 
 logger = logging.getLogger(__name__)
@@ -48,10 +49,15 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await stack.aclose()
+        # 退出前把 Langfuse 缓冲推走；未启用或失败都不影响进程退出
+        langfuse.flush()
 
 
 app = FastAPI(title="ShopPilot", lifespan=lifespan)
 app.include_router(customer.router)
+app.include_router(feedback.router)
+app.include_router(eval_cases.router)
+app.include_router(flywheel.router)
 app.include_router(admin.router)
 
 

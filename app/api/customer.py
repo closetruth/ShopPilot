@@ -19,6 +19,9 @@ from app.api._graph import get_graph
 from app.context.context_builder import build_context
 from app.core import store
 from app.core.llm import get_llm_quiet
+from app.cost import budget
+from app.observability import langfuse
+from app.observability.usage import build_usage_handler
 from app.tools import AgentContext, tool_labels
 from app.tools.executor import ActionError, executor
 from app.tools.schemas import WorkOrderCreate
@@ -65,6 +68,15 @@ def _pending_from_tool_event(event: dict) -> dict | None:
         return None
     action = payload.get("pending_action")
     return action if isinstance(action, dict) else None
+
+
+def _budget_block(conversation_id: str) -> tuple[str | None, str | None]:
+    """返回 (降级话术, 闸层)。全局闸优先——全局没钱了，会话额度再宽也没用。"""
+    if budget.global_blocked():
+        return budget.GLOBAL_BLOCK_TEXT, "global"
+    if budget.conversation_over_budget(conversation_id):
+        return budget.CONVERSATION_BLOCK_TEXT, "conversation"
+    return None, None
 
 
 def _record_turn_trace(
@@ -129,11 +141,49 @@ async def chat(req: ChatRequest) -> StreamingResponse:
 
     async def stream():
         yield _sse({"conversation_id": conversation_id})
+
+        # 成本闸：全局日成本 / 会话日 token。触闸只降级话术，不返错误码，
+        # 顾客照常拿到一句回答，事件照常落库供看板统计。
+        blocked_text, blocked_scope = _budget_block(conversation_id)
+        if blocked_text:
+            budget.record_event(
+                blocked_scope,
+                "blocked",
+                conversation_id=conversation_id,
+                visitor_id=req.visitor_id,
+            )
+            blocked_id = store.append_message(
+                conversation_id, "assistant", blocked_text
+            )
+            yield _sse({"delta": blocked_text})
+            yield _sse({"message_id": blocked_id})
+            yield _sse("[DONE]")
+            return
+
         collected: list[str] = []
         saved = False
         started = time.monotonic()
         try:
             graph = await get_graph(get_llm_quiet)
+            usage_handler = build_usage_handler(
+                conversation_id=conversation_id,
+                visitor_id=req.visitor_id,
+                source="chat",
+            )
+            callbacks = [usage_handler]
+            lf_handler = langfuse.build_handler()
+            if lf_handler is not None:
+                callbacks.append(lf_handler)
+            config = {
+                "configurable": {"thread_id": conversation_id},
+                "callbacks": callbacks,
+                "metadata": {
+                    "shoppilot_source": "chat",
+                    "shoppilot_conversation_id": conversation_id,
+                    "shoppilot_visitor_id": req.visitor_id,
+                    **langfuse.trace_metadata(conversation_id, req.visitor_id),
+                },
+            }
 
             async for event in graph.astream_events(
                 {
@@ -142,7 +192,7 @@ async def chat(req: ChatRequest) -> StreamingResponse:
                     "visitor_id": req.visitor_id,
                 },
                 context=AgentContext(visitor_id=req.visitor_id),
-                config={"configurable": {"thread_id": conversation_id}},
+                config=config,
                 version="v2",
             ):
                 kind = event.get("event")
@@ -182,8 +232,11 @@ async def chat(req: ChatRequest) -> StreamingResponse:
                 yield _sse({"delta": final_text})
 
             assistant_text = "".join(collected).strip()
+            assistant_id = None
             if assistant_text:
-                store.append_message(conversation_id, "assistant", assistant_text)
+                assistant_id = store.append_message(
+                    conversation_id, "assistant", assistant_text
+                )
                 saved = True
 
             # 轨迹落库：观测数据，失败不影响对话（record_trace 自兜底）
@@ -191,6 +244,9 @@ async def chat(req: ChatRequest) -> StreamingResponse:
             _record_turn_trace(
                 conversation_id, req.visitor_id, req.message, values, started
             )
+            if assistant_id is not None:
+                # 反馈锚点：前端拿到 id 才渲染赞踩按钮
+                yield _sse({"message_id": assistant_id})
             yield _sse("[DONE]")
         except Exception as exc:  # noqa: BLE001 - 上游任何异常都要转成前端可见错误
             logger.exception("对话失败")

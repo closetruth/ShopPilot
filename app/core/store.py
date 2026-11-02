@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from app.core.db import conn_params as _conn_params
 from app.core.db import init_db, now
-from app.repo import audit, chats, commerce, insights, knowledge, pending
+from app.repo import audit, chats, commerce, evals, feedback, insights, knowledge, pending
 
 __all__ = [
     "init_db",
@@ -63,6 +63,22 @@ __all__ = [
     "get_pending_action",
     "resolve_pending_action",
     "list_pending_actions",
+    # 用户反馈
+    "feedback_message_of",
+    "upsert_feedback",
+    "remove_feedback",
+    "list_feedback",
+    "feedback_by_id",
+    "feedback_stats",
+    "list_negative_feedback",
+    "feedback_reasons",
+    "feedback_query_for",
+    "low_confidence_by_id",
+    # 评估样本
+    "create_eval_case",
+    "list_eval_cases",
+    "get_eval_case",
+    "set_eval_case_status",
 ]
 
 
@@ -141,3 +157,24 @@ create_pending_action = pending.create
 get_pending_action = pending.get
 resolve_pending_action = pending.resolve
 list_pending_actions = pending.list_by_visitor
+
+# ---------- 用户反馈 ----------
+
+feedback_message_of = feedback.message_of
+upsert_feedback = feedback.upsert
+remove_feedback = feedback.remove
+list_feedback = feedback.by_conversation
+feedback_by_id = feedback.by_id
+feedback_stats = feedback.stats
+list_negative_feedback = feedback.list_negative
+feedback_reasons = feedback.REASONS
+feedback_query_for = feedback.query_for
+
+low_confidence_by_id = insights.low_confidence_by_id
+
+# ---------- 评估样本 ----------
+
+create_eval_case = evals.create_case
+list_eval_cases = evals.list_cases
+get_eval_case = evals.get_case
+set_eval_case_status = evals.set_case_status
