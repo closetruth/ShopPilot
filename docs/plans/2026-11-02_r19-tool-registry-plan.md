@@ -12,13 +12,14 @@
 
 ---
 
-- [ ] **Task 1：包装工具的 runtime 注入 spike**
+- [x] **Task 1：包装工具的 runtime 注入 spike**
   - 用现有 `lookup_product` 构造一个包装工具：签名保留
     `runtime: ToolRuntime[AgentContext]`，`args_schema` 显式传入
   - 断言四件事：模型可见 schema 与 `args_schema` 一致且不含 `runtime`；
     `ToolNode` 能把 `runtime` 注进来；包装内能读到
     `runtime.context.visitor_id`；调用结果与直调一致
-  - 若任一条不成立，立即改用备选方案（工具体内首行调 executor）并在此打勾说明
+  - 结论：四条全部成立，**走主方案**（包装函数 + 显式 `args_schema`），
+    不需要退回备选。spike 用最小回显工具，避免拉 MySQL
   - 测试：`tests/test_tool_wrapper.py`
   - 提交：`test: 钉住包装工具的 runtime 注入，确认不动 create_react_agent 也能拦截`
 
