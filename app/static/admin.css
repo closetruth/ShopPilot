@@ -438,3 +438,122 @@
   background: #fdf4e6;
   color: #8a5d12;
 }
+
+/* ---------- 工具注册与审计页 ---------- */
+
+.tools-main {
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 20px;
+  gap: 28px;
+}
+
+.tools-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tools-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tools-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tools-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.audit-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.audit-filters select {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.tools-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.tools-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tools-table th,
+.tools-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.tools-table th {
+  background: #fbfcfd;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.tools-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tools-table tbody tr:hover {
+  background: var(--hover);
+}
+
+.tools-detail {
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.tools-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--bot);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.tools-badge.src-builtin { background: #eef3fc; color: #3d5c92; }
+.tools-badge.src-mcp { background: #eefaf1; color: #2c7a4b; }
+.tools-badge.risk-read { background: #eefaf1; color: #2c7a4b; }
+.tools-badge.risk-write { background: #fdf4e6; color: #8a5d12; }
+.tools-badge.risk-destructive { background: #fdeaea; color: var(--error); }
+.tools-badge.status-ok { background: #eefaf1; color: #2c7a4b; }
+.tools-badge.status-error { background: #fdeaea; color: var(--error); }
+.tools-badge.status-denied { background: #fdf4e6; color: #8a5d12; }
+.tools-badge.status-pending { background: #eef3fc; color: #3d5c92; }
+.tools-badge.status-cancelled { background: var(--bot); color: var(--muted); }
+
+.tools-more {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}

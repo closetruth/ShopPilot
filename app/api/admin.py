@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app import store, vector_store
 from app.markdown_split import split_markdown
+from app.tools.registry import registry
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +161,51 @@ async def admin_delete_faq(faq_id: str) -> dict:
 @router.get("/admin")
 async def admin_page() -> FileResponse:
     return FileResponse(_STATIC_DIR / "admin.html")
+
+
+@router.get("/admin/tools")
+async def admin_tools_page() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "admin_tools.html")
+
+
+# ---------- 工具注册清单与审计 ----------
+
+
+@router.get("/api/admin/tools")
+async def admin_tools() -> dict:
+    """模型能看到的工具清单。参数是给页面看的，不是给模型看的。"""
+    return {
+        "items": [
+            {
+                "name": spec.name,
+                "label": spec.label,
+                "source": spec.source,
+                "server": spec.server,
+                "scope": spec.scope,
+                "risk": spec.risk,
+                "requires_confirmation": spec.requires_confirmation,
+                "allowed_callers": sorted(spec.allowed_callers),
+                "timeout_s": spec.timeout_s,
+            }
+            for spec in registry.all()
+        ]
+    }
+
+
+@router.get("/api/admin/audit")
+async def admin_audit(
+    tool: str | None = None,
+    visitor_id: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    rows = store.list_tool_audits(
+        tool=tool, visitor_id=visitor_id, status=status, limit=limit, offset=offset
+    )
+    return {"items": rows, "limit": limit, "offset": offset}
 
 
 # ---------- 批量导入 ----------

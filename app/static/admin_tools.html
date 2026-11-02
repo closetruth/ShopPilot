@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>工具与审计 · ShopPilot</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body class="admin-body">
+  <div class="admin">
+    <header class="admin-head">
+      <h1>工具注册与调用审计</h1>
+      <div class="admin-actions">
+        <span class="admin-count" id="toolCount"></span>
+        <button class="btn" id="refreshBtn" type="button">刷新</button>
+        <a class="btn btn-link" href="/admin">知识库管理</a>
+        <a class="btn btn-link" href="/">返回对话</a>
+      </div>
+    </header>
+
+    <main class="admin-main tools-main">
+      <section class="tools-section">
+        <h2 class="tools-title">注册清单</h2>
+        <p class="tools-hint">模型能看到的全部工具，以及它们的权限与来源。</p>
+        <div class="tools-table-wrap">
+          <table class="tools-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>标签</th>
+                <th>来源</th>
+                <th>数据范围</th>
+                <th>风险</th>
+                <th>需确认</th>
+                <th>允许调用者</th>
+                <th>超时</th>
+              </tr>
+            </thead>
+            <tbody id="toolRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tools-section">
+        <div class="tools-section-head">
+          <div>
+            <h2 class="tools-title">调用流水</h2>
+            <p class="tools-hint">每次调用一行，含被拒绝与失败。</p>
+          </div>
+          <div class="audit-filters">
+            <select id="filterTool" aria-label="按工具过滤">
+              <option value="">全部工具</option>
+            </select>
+            <select id="filterStatus" aria-label="按状态过滤">
+              <option value="">全部状态</option>
+              <option value="ok">ok</option>
+              <option value="error">error</option>
+              <option value="denied">denied</option>
+              <option value="pending">pending</option>
+              <option value="cancelled">cancelled</option>
+            </select>
+          </div>
+        </div>
+        <div class="tools-table-wrap">
+          <table class="tools-table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>工具</th>
+                <th>来源</th>
+                <th>调用者</th>
+                <th>状态</th>
+                <th>耗时</th>
+                <th>访客</th>
+                <th>参数 / 错误</th>
+              </tr>
+            </thead>
+            <tbody id="auditRows"></tbody>
+          </table>
+        </div>
+        <div class="tools-more">
+          <button class="btn" id="moreBtn" type="button">加载更多</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/admin_tools.js"></script>
+</body>
+</html>
