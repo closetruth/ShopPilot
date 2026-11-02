@@ -11,7 +11,7 @@ import uuid
 from datetime import timedelta
 from typing import Any
 
-from app.db import connect, now
+from app.core.db import connect, now
 
 ACTION_TTL_MINUTES = 30
 

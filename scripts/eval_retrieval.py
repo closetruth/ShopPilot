@@ -18,7 +18,8 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from app import retrieval, store
+from app.retrieval import retrieval
+from app.core import store
 
 EVAL_CSV = Path("docs/eval/r13-queries.csv")
 OUT_JSON = Path("docs/eval/r13-results.json")

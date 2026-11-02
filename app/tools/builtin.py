@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import logging
 
-from app import store
-from app.schemas import NoArgs, ProductQuery, WorkOrderCreate, WorkOrderQuery
+from app.core import store
+from app.tools.schemas import NoArgs, ProductQuery, WorkOrderCreate, WorkOrderQuery
 from app.tools.registry import registered
 
 logger = logging.getLogger(__name__)

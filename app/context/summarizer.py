@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import logging
 
-from app import store
-from app.context_builder import context_window
-from app.tokens import count_messages_tokens, count_tokens
+from app.context.context_builder import context_window
+from app.context.tokens import count_messages_tokens, count_tokens
+from app.core import store
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def _threshold() -> int:
     window = context_window()
     total = window // 4
     # 与 context_builder 同口径：保底后的实际历史预算
-    from app.context_builder import HISTORY_BUDGET_FLOOR
+    from app.context.context_builder import HISTORY_BUDGET_FLOOR
 
     rough_budget = max(total - 3500, HISTORY_BUDGET_FLOOR)  # 3500 ≈ system+tools+输出实测
     return int(rough_budget * 0.8)
@@ -83,7 +83,7 @@ async def maybe_summarize(conversation_id: str, *, llm=None) -> dict | None:
         tighten = "\n- 现有梗概过长，压缩到 300 字以内，保留全部订单号与诉求"
 
     if llm is None:
-        from app.llm import get_llm_quiet
+        from app.core.llm import get_llm_quiet
 
         llm = get_llm_quiet()
 

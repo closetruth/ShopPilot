@@ -9,8 +9,8 @@ import uuid
 
 import pytest
 
-from app import store
-from app.summarizer import SUMMARY_PROMPT, maybe_summarize
+from app.context.summarizer import SUMMARY_PROMPT, maybe_summarize
+from app.core import store
 
 
 @pytest.fixture

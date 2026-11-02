@@ -13,7 +13,7 @@ import uuid
 import pytest
 from langgraph.checkpoint.base import empty_checkpoint
 
-from app.checkpointer import get_checkpointer
+from app.core.checkpointer import get_checkpointer
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ async def saver():
     （同一循环内复用）由 lifespan 预热 + 图运行验证，这里只验证
     存储行为本身。
     """
-    from app.checkpointer import build_mysql_saver
+    from app.core.checkpointer import build_mysql_saver
 
     s = await build_mysql_saver()
     yield s
@@ -79,7 +79,7 @@ async def test_roundtrip_with_dict_blob(mysql_checkpoint, saver):
 @pytest.mark.anyio
 async def test_state_lands_in_mysql(mysql_checkpoint, saver):
     """绕过 saver 直接查库，确认状态真的写进了 MySQL，而非进程内缓存。"""
-    from app.db import connect
+    from app.core.db import connect
 
     config = {"configurable": {"thread_id": mysql_checkpoint, "checkpoint_ns": ""}}
     state = {"resolved_query": "查询物流", "intent": "knowledge", "turn_count": 1}
@@ -104,7 +104,7 @@ def test_sqlite_backend_roundtrip(tmp_path):
 
     SqliteSaver 是同步 saver，同步调用。
     """
-    from app.checkpointer import _build_sqlite_checkpointer
+    from app.core.checkpointer import _build_sqlite_checkpointer
 
     saver = _build_sqlite_checkpointer(tmp_path / "checkpoints.db")
     saver.setup()
@@ -122,7 +122,7 @@ async def test_backend_selected_by_env(monkeypatch):
     """CHECKPOINT_BACKEND=sqlite 时 _build_checkpointer 返回 SqliteSaver。"""
     from langgraph.checkpoint.sqlite import SqliteSaver
 
-    from app.checkpointer import _build_checkpointer
+    from app.core.checkpointer import _build_checkpointer
 
     monkeypatch.setenv("CHECKPOINT_BACKEND", "sqlite")
     saver = await _build_checkpointer("sqlite")

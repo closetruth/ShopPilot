@@ -14,7 +14,7 @@ import os
 
 from pymilvus import DataType, MilvusClient
 
-from app.embedding import EMBED_DIM, EmbeddingError, embed_texts
+from app.retrieval.embedding import EMBED_DIM, EmbeddingError, embed_texts
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ def rebuild_from_store(drop: bool = False) -> dict:
     在服务进程内调用可以避开 Milvus Lite 的文件独占锁问题。
     只索引 FAQ：商品与工单按结构化条件查询，不进向量库。
     """
-    from app import store
+    from app.core import store
 
     if drop:
         clear()

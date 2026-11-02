@@ -13,8 +13,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-from app import store
-from app.tokens import count_messages_tokens, count_tokens
+from app.context.tokens import count_messages_tokens, count_tokens
+from app.core import store
 
 # 输出余量：给模型回复留的空间，不参与历史分配
 OUTPUT_RESERVE = 1024
@@ -46,7 +46,7 @@ def context_window() -> int:
 
 
 def _system_tokens() -> int:
-    from app.agent import BUSINESS_PROMPT
+    from app.chat.agent import BUSINESS_PROMPT
 
     return count_tokens(BUSINESS_PROMPT)
 

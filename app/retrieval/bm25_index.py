@@ -15,7 +15,7 @@ import re
 import jieba
 from rank_bm25 import BM25Okapi
 
-from app import store
+from app.core import store
 
 logger = logging.getLogger(__name__)
 

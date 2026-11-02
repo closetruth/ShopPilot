@@ -12,7 +12,7 @@ from functools import lru_cache
 
 import httpx
 
-from app import store
+from app.core import store
 
 logger = logging.getLogger(__name__)
 

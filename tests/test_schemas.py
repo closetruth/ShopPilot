@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import ProductQuery, WorkOrderCreate, WorkOrderQuery
+from app.tools.schemas import ProductQuery, WorkOrderCreate, WorkOrderQuery
 
 
 def test_product_requires_keyword_or_id():

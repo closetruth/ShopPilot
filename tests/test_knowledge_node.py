@@ -10,8 +10,8 @@ import os
 
 import pytest
 
-from app import store
-from app.knowledge_node import KnowledgeOutcome, run_knowledge_retrieval
+from app.core import store
+from app.retrieval.knowledge_node import KnowledgeOutcome, run_knowledge_retrieval
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("SILICONFLOW_API_KEY", "").strip(),
@@ -26,7 +26,7 @@ def indexed_faq():
 
     tmpdir = tempfile.mkdtemp()
     os.environ["VECTOR_DB_PATH"] = os.path.join(tmpdir, "milvus.db")
-    from app import vector_store
+    from app.retrieval import vector_store
 
     vector_store.reset_client()
 
@@ -125,7 +125,7 @@ async def test_fallback_to_original_when_rewrite_insufficient(indexed_faq, monke
     mock 词表强制触发一个「坏」词条，让改写必然发生；再 mock 检索让
     改写 query 分数低于原话，验证回退选中了原话那组。
     """
-    from app import vector_store
+    from app.retrieval import vector_store
 
     calls: list[str] = []
 
@@ -138,7 +138,7 @@ async def test_fallback_to_original_when_rewrite_insufficient(indexed_faq, monke
 
     monkeypatch.setattr(vector_store, "search", fake_search)
     monkeypatch.setattr(
-        "app.knowledge_node.rewrite_query",
+        "app.retrieval.knowledge_node.rewrite_query",
         lambda q: (f"{q} 质量问题", ["质量问题"]),
     )
 

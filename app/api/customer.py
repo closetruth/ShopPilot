@@ -15,13 +15,13 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field, ValidationError
 
-from app import store
 from app.api._graph import get_graph
-from app.context_builder import build_context
-from app.llm import get_llm_quiet
-from app.schemas import WorkOrderCreate
+from app.context.context_builder import build_context
+from app.core import store
+from app.core.llm import get_llm_quiet
 from app.tools import AgentContext, tool_labels
 from app.tools.executor import ActionError, executor
+from app.tools.schemas import WorkOrderCreate
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +215,7 @@ async def chat(req: ChatRequest) -> StreamingResponse:
 
 async def _summarize_quietly(conversation_id: str) -> None:
     try:
-        from app.summarizer import maybe_summarize
+        from app.context.summarizer import maybe_summarize
 
         await maybe_summarize(conversation_id)
     except Exception:  # noqa: BLE001 - 后台任务任何异常都不外泄

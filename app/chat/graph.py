@@ -13,12 +13,12 @@ from typing import Any, TypedDict
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 
-from app import store
-from app.agent import run_business_agent_with_limit
-from app.intent import classify_intent
-from app.knowledge_node import run_knowledge_retrieval
-from app.resolve import needs_resolution, resolve_reference
-from app.templates import chitchat_reply, complaint_reply
+from app.chat.agent import run_business_agent_with_limit
+from app.chat.intent import classify_intent
+from app.chat.resolve import needs_resolution, resolve_reference
+from app.chat.templates import chitchat_reply, complaint_reply
+from app.core import store
+from app.retrieval.knowledge_node import run_knowledge_retrieval
 
 logger = logging.getLogger(__name__)
 

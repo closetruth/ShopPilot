@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.markdown_split import parse_frontmatter, split_markdown
+from app.retrieval.markdown_split import parse_frontmatter, split_markdown
 from scripts.import_faq import build_documents
 
 

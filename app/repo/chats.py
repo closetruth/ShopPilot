@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from app.db import connect, now
+from app.core.db import connect, now
 
 
 def create_conversation(visitor_id: str) -> str:

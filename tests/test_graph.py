@@ -9,7 +9,7 @@ import pytest
 from langchain_core.messages import AIMessage
 from langgraph.checkpoint.memory import MemorySaver
 
-from app.graph import build_graph
+from app.chat.graph import build_graph
 
 
 class ScriptedLLM:
@@ -38,7 +38,7 @@ class ScriptedLLM:
 
 
 def _mock_vector(monkeypatch, hits: list[dict]):
-    from app import vector_store
+    from app.retrieval import vector_store
 
     def fake_search(query, visitor_id, top_k=3):
         return hits

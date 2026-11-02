@@ -13,7 +13,7 @@ import pytest
 from langgraph.prebuilt import ToolRuntime
 from pydantic import BaseModel
 
-from app import store
+from app.core import store
 from app.tools import AgentContext
 from app.tools.executor import Executor, RuntimeMeta, runtime_meta
 from app.tools.registry import ToolSpec, build_tool

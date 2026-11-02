@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pymysql
 
-from app.store import _conn_params
+from app.core.db import conn_params
 
 SQLITE_PATH = Path("data/shoppilot.db")
 
@@ -48,7 +48,7 @@ def migrate(dry_run: bool = False) -> None:
             print(f"  [dry-run] 会话 {c['id']} ← {c['visitor_id']}")
         return
 
-    conn = pymysql.connect(**_conn_params())
+    conn = pymysql.connect(**conn_params())
     inserted_conv = 0
     inserted_msg = 0
     try:

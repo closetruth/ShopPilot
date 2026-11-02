@@ -8,9 +8,8 @@ TestClient + mock 图跑真实 stream()，断言事件序列、visitor_id 归属
 import pytest
 from fastapi.testclient import TestClient
 
-from app import main as app_main
 from app.api import _graph as graph_singleton
-from app.graph import build_graph
+from app.chat.graph import build_graph
 
 
 @pytest.fixture
@@ -34,7 +33,7 @@ def client(monkeypatch):
             "total_tokens": None,
         }
 
-    monkeypatch.setattr("app.graph.run_business_agent_with_limit", fake_run)
+    monkeypatch.setattr("app.chat.graph.run_business_agent_with_limit", fake_run)
 
     graph = build_graph(checkpointer=MemorySaver(), llm=None, llm_quiet=None)
     monkeypatch.setattr(graph_singleton, "_compiled_graph", graph)
@@ -114,10 +113,10 @@ def test_business_agent_receives_context_messages(client):
     from langgraph.checkpoint.memory import MemorySaver
 
     from app.api import _graph as graph_singleton
-    from app.graph import build_graph
+    from app.chat.graph import build_graph
 
     # 重新打 runner patch（fixture 里的 fake_run 不捕获 messages）
-    import app.graph as graph_mod
+    import app.chat.graph as graph_mod
 
     graph_mod.run_business_agent_with_limit = fake_run
     graph = build_graph(checkpointer=MemorySaver(), llm=None, llm_quiet=None)
@@ -141,7 +140,7 @@ def test_business_agent_receives_context_messages(client):
 
 def test_budget_recorded_in_trace(client):
     """r18 可观测：每轮 trace 的 detail 带 budget 账目。"""
-    from app import store
+    from app.core import store
 
     visitor_id = "ctx-r18-budget"
     with client.stream(

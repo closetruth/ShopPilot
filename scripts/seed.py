@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import pymysql
 import pymysql.cursors
 
-from app.store import _conn_params
+from app.core.db import conn_params
 
 DEMO_VISITOR = "demo-visitor"
 
@@ -49,7 +49,7 @@ WORK_ORDERS = [
 
 
 def seed() -> None:
-    conn = pymysql.connect(**_conn_params())
+    conn = pymysql.connect(**conn_params())
     try:
         with conn.cursor() as cur:
             # 清掉旧格式的演示工单，避免与新编号并存

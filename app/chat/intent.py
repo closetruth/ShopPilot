@@ -19,7 +19,7 @@ import logging
 import re
 from dataclasses import dataclass
 
-from app.query_rewrite import aftersale_pattern
+from app.retrieval.query_rewrite import aftersale_pattern
 
 logger = logging.getLogger(__name__)
 

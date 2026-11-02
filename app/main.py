@@ -14,9 +14,9 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import admin, customer
 from app.api._graph import get_graph
-from app.llm import ConfigError, get_llm, get_llm_quiet
+from app.core import store
+from app.core.llm import ConfigError, get_llm, get_llm_quiet
 from app.tools import mcp
-from app import store
 
 logger = logging.getLogger(__name__)
 

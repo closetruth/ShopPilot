@@ -13,8 +13,8 @@ import pytest
 from langgraph.prebuilt import ToolRuntime
 from pydantic import BaseModel
 
-from app import store
-from app.db import connect, now
+from app.core import store
+from app.core.db import connect, now
 from app.tools import AgentContext
 from app.tools.executor import ActionError, Executor
 from app.tools.registry import ToolSpec, registry

@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from app.query_rewrite import REWRITE_RULES, rewrite_query
+from app.retrieval.query_rewrite import REWRITE_RULES, rewrite_query
 
 
 def test_no_match_returns_original():
@@ -60,7 +60,7 @@ def test_aftersale_projection_matches_wordlist():
     aftersale 规则里的每个触发分支都必须被派生正则命中——将来有人
     改了词表忘了派生逻辑（或反过来），这条会红。
     """
-    from app.query_rewrite import REWRITE_RULES, aftersale_pattern
+    from app.retrieval.query_rewrite import REWRITE_RULES, aftersale_pattern
 
     pattern = aftersale_pattern()
     for rule in REWRITE_RULES:
@@ -79,7 +79,7 @@ def test_aftersale_projection_matches_wordlist():
 )
 def test_terms_exist_in_faq_content():
     """词条术语必须真实出现在 FAQ 内容/标题/小节里——防词表与条款脱节。"""
-    from app import store
+    from app.core import store
 
     store.init_db()
     corpus = "\n".join(
@@ -100,7 +100,7 @@ def test_terms_improve_or_keep_retrieval():
     - 或改写后分数提升 ≥ 0.05
     不满足的词条是噪声源，必须调整或移除。
     """
-    from app import vector_store
+    from app.retrieval import vector_store
 
     samples = {  # 每条词条一个代表性口语样本
         "物流延迟": "快递好久没动",

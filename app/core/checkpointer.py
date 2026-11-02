@@ -20,7 +20,7 @@ import pymysql
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.mysql.base import MIGRATIONS
 
-from app.db import conn_params
+from app.core.db import conn_params
 
 # 包内 SQL 假定 MySQL 8 的字符集默认排序：SELECT 的 json_table 列硬编码
 # CHARACTER SET utf8mb4（解析为 utf8mb4_0900_ai_ci），JSON 函数结果的排序

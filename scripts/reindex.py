@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import sys
 
-from app import store, vector_store
+from app.core import store
+from app.retrieval import vector_store
 
 
 def main(drop: bool = False) -> None:

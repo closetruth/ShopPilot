@@ -7,7 +7,7 @@
 
 import pytest
 
-from app.agent import STEP_LIMIT, TOKEN_LIMIT, build_business_agent
+from app.chat.agent import STEP_LIMIT, TOKEN_LIMIT, build_business_agent
 
 BUSINESS_FOUR = {
     "lookup_product",
@@ -64,7 +64,7 @@ async def test_recursion_limit_stops_loop():
     """模型陷入工具循环时按步数上限中断，输出转人工话术。"""
     from langchain_core.messages import HumanMessage
 
-    from app.agent import run_business_agent_with_limit
+    from app.chat.agent import run_business_agent_with_limit
 
     result = await run_business_agent_with_limit(
         {"messages": [HumanMessage(content="查订单")]},
@@ -77,7 +77,7 @@ async def test_recursion_limit_stops_loop():
 
 def test_token_limit_exceeded_detected():
     """token 累计超过上限时判定触线。"""
-    from app.agent import _tokens_exceeded
+    from app.chat.agent import _tokens_exceeded
 
     assert _tokens_exceeded(used=7900, incoming=200) is True
     assert _tokens_exceeded(used=7900, incoming=100) is False

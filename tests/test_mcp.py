@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from langgraph.prebuilt import ToolRuntime
 
-from app import store
+from app.core import store
 from app.tools import AgentContext
 from app.tools import mcp as mcp_module
 from app.tools.executor import Executor

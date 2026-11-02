@@ -12,8 +12,9 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, ValidationError
 
-from app import store, vector_store
-from app.markdown_split import split_markdown
+from app.core import store
+from app.retrieval import vector_store
+from app.retrieval.markdown_split import split_markdown
 from app.tools.registry import registry
 
 logger = logging.getLogger(__name__)

@@ -11,8 +11,8 @@
 
 from __future__ import annotations
 
-from app.db import conn_params as _conn_params
-from app.db import init_db, now
+from app.core.db import conn_params as _conn_params
+from app.core.db import init_db, now
 from app.repo import audit, chats, commerce, insights, knowledge, pending
 
 __all__ = [

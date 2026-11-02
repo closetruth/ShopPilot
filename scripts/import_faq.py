@@ -22,8 +22,9 @@ import re
 import sys
 from pathlib import Path
 
-from app import store, vector_store
-from app.markdown_split import parse_frontmatter, split_markdown
+from app.core import store
+from app.retrieval import vector_store
+from app.retrieval.markdown_split import parse_frontmatter, split_markdown
 
 FAQ_DIR = Path("data/faq")
 

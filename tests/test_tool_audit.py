@@ -8,7 +8,7 @@ import uuid
 
 import pytest
 
-from app import store
+from app.core import store
 from app.repo import audit
 
 

@@ -10,7 +10,7 @@
 import pytest
 from langchain_core.messages import AIMessage
 
-from app.intent import IntentResult, classify_by_rules, classify_intent
+from app.chat.intent import IntentResult, classify_by_rules, classify_intent
 
 
 @pytest.mark.parametrize("message,expected", [

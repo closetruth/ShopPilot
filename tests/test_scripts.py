@@ -43,7 +43,7 @@ def test_reindex_reads_fields_returned_by_rebuild(monkeypatch):
     这是上一轮改动引入的真实回归：脚本还在读 products / work_orders，
     而函数已经不再返回它们。
     """
-    from app import vector_store
+    from app.retrieval import vector_store
     from scripts import reindex
 
     fake_result = {"faq": 0, "total": 0, "written": 0}

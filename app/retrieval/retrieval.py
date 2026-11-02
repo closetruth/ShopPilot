@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import logging
 
-from app import bm25_index, store, vector_store
-from app.rerank import rerank
+from app.core import store
+from app.retrieval import bm25_index, vector_store
+from app.retrieval.rerank import rerank
 
 logger = logging.getLogger(__name__)
 

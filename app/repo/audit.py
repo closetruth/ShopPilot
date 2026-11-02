@@ -10,7 +10,7 @@ import logging
 import re
 from typing import Any
 
-from app.db import connect, now
+from app.core.db import connect, now
 
 logger = logging.getLogger(__name__)
 

@@ -78,7 +78,7 @@ logistics__query_shipping_eta 查物流时效）。这类工具与内置工具�
 
 def build_business_agent(*, llm=None):
     """业务主力 agent：业务四件工具 + 缺信息反问的 prompt。"""
-    from app.llm import get_llm
+    from app.core.llm import get_llm
 
     return create_react_agent(
         model=llm or get_llm(),

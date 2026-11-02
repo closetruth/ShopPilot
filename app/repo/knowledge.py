@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from app.db import connect, now
+from app.core.db import connect, now
 
 
 def upsert_document(doc: dict) -> None:

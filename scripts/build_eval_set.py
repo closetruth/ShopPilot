@@ -16,7 +16,8 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from app import store, vector_store
+from app.core import store
+from app.retrieval import vector_store
 
 EVAL_DIR = Path("eval_data")
 OUT_CSV = Path("docs/eval/r13-queries.csv")

@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.markdown_split import (
+from app.retrieval.markdown_split import (
     DEFAULT_MAX_CHARS,
     MAX_SECTION,
     MIN_CONTENT,

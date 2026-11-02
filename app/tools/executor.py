@@ -18,7 +18,7 @@ from typing import Any
 from langgraph.prebuilt import ToolRuntime
 from pydantic import ValidationError
 
-from app import store
+from app.core import store
 from app.tools.context import AgentContext
 from app.tools.permission import Caller, Denied, authorize
 from app.tools.registry import ToolSpec, registry

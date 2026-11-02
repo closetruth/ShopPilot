@@ -11,8 +11,8 @@ import uuid
 
 import pytest
 
-from app import vector_store
-from app.embedding import EmbeddingError, embed_texts
+from app.retrieval import vector_store
+from app.retrieval.embedding import EmbeddingError, embed_texts
 
 
 def _has_embedding_config() -> bool:
@@ -75,7 +75,7 @@ def test_embed_empty_list():
 @requires_embedding
 def test_embed_missing_key_raises(monkeypatch):
     monkeypatch.setenv("SILICONFLOW_API_KEY", "")
-    from app import embedding
+    from app.retrieval import embedding
 
     embedding._client.cache_clear()
     try:
@@ -135,7 +135,7 @@ def test_delete_by_source(temp_vector_db):
 def test_upsert_without_key_does_not_raise(monkeypatch, temp_vector_db):
     """写入失败不应向调用方抛出——MySQL 是事实来源，索引可重建。"""
     monkeypatch.setenv("SILICONFLOW_API_KEY", "")
-    from app import embedding
+    from app.retrieval import embedding
 
     embedding._client.cache_clear()
     try:

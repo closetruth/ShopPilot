@@ -8,8 +8,8 @@ import uuid
 
 import pytest
 
-from app import store
-from app.context_builder import ContextBundle, build_context
+from app.core import store
+from app.context.context_builder import ContextBundle, build_context
 
 
 @pytest.fixture

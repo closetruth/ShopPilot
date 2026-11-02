@@ -8,8 +8,8 @@ import uuid
 
 import pytest
 
-from app import store
-from app.templates import chitchat_reply, complaint_reply
+from app.chat.templates import chitchat_reply, complaint_reply
+from app.core import store
 
 
 def test_chitchat_mentions_capabilities():

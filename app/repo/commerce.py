@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import timedelta
 
-from app.db import connect, now
+from app.core.db import connect, now
 
 WORK_ORDER_OPEN_STATUSES = ("待处理", "处理中")
 DRAFT_TTL_MINUTES = 30

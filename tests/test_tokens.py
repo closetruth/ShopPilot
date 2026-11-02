@@ -6,7 +6,7 @@ tiktoken cl100k_base 对 DeepSeek tokenizer 是近似——中文略多计，
 
 import pytest
 
-from app.tokens import count_messages_tokens, count_tokens
+from app.context.tokens import count_messages_tokens, count_tokens
 
 
 def test_chinese_counts_reasonably():
@@ -34,7 +34,7 @@ def test_messages_add_per_message_overhead():
 
 def test_fallback_when_tiktoken_unavailable(monkeypatch):
     """词表加载失败降级 chars/3，对话不能因为计数器挂掉。"""
-    import app.tokens as t
+    import app.context.tokens as t
 
     monkeypatch.setattr(t, "_get_encoding", lambda: None)
     assert t.count_tokens("一二三四五六") == 2  # 6 字 / 3

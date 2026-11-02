@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from app import store
+from app.core import store
 
 
 pytestmark = pytest.mark.skipif(

@@ -13,8 +13,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from app import store, vector_store
-from app.query_rewrite import rewrite_query
+from app.core import store
+from app.retrieval import vector_store
+from app.retrieval.query_rewrite import rewrite_query
 
 logger = logging.getLogger(__name__)
 

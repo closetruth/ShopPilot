@@ -8,7 +8,7 @@ resolve_reference 用 FakeLLM 钉住两件事：正常改写、异常时原样�
 import pytest
 from langchain_core.messages import AIMessage
 
-from app.resolve import needs_resolution, resolve_reference
+from app.chat.resolve import needs_resolution, resolve_reference
 
 
 # ── Step 1: 触发条件测试 ─────────────────────────────────────────────

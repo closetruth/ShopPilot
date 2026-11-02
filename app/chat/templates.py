@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-from app import store
+from app.core import store
 
 logger = logging.getLogger(__name__)
 

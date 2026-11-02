@@ -8,8 +8,8 @@ import os
 
 import pytest
 
-from app import store
-from app.knowledge_node import RELEVANCE_THRESHOLD, run_knowledge_retrieval
+from app.core import store
+from app.retrieval.knowledge_node import RELEVANCE_THRESHOLD, run_knowledge_retrieval
 
 
 pytestmark = pytest.mark.skipif(
@@ -29,7 +29,7 @@ def indexed_faq():
 
     tmpdir = tempfile.mkdtemp()
     os.environ["VECTOR_DB_PATH"] = os.path.join(tmpdir, "milvus.db")
-    from app import vector_store
+    from app.retrieval import vector_store
 
     vector_store.reset_client()
 
@@ -108,8 +108,8 @@ async def test_packaging_broken_improves_but_may_still_refuse(indexed_faq):
     对齐术语后顺带过闸，测试固化实际行为：显著提升 + 命中质量问题
     退换货方向。
     """
-    from app import vector_store
-    from app.query_rewrite import rewrite_query
+    from app.retrieval import vector_store
+    from app.retrieval.query_rewrite import rewrite_query
 
     base = vector_store.search("包装破了", "", top_k=1)
     base_score = base[0]["score"] if base else 0.0
@@ -203,7 +203,7 @@ def test_threshold_has_margin_on_product_queries(indexed_faq):
     政策与商品的分界线上，任一方向的小改动都会导致误判。届时该重新定阈值
     或调整嵌入文本，而不是让测试恰好擦线通过。
     """
-    from app import vector_store
+    from app.retrieval import vector_store
 
     hits = vector_store.search("杯子多少钱", "", top_k=3)
     if not hits:
