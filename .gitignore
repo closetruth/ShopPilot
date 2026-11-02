@@ -12,5 +12,10 @@ data/faq/*
 !data/faq/*.md
 *.db
 *.sqlite3
+# 评估报告是每次运行的产物，不是资产
+docs/eval/
+# 根目录的 superpowers 是本地装的技能仓库，自带 .git，不属于本项目
+/superpowers/
+.idea/
 .DS_Store
 .claude/settings.local.json

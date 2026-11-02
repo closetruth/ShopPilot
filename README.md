@@ -33,6 +33,12 @@ uv run uvicorn app.main:app --reload
 | `EMBED_MODEL` | 嵌入模型 | `BAAI/bge-m3` |
 | `EMBED_BASE_URL` | 嵌入服务地址 | `https://api.siliconflow.cn/v1` |
 | `VECTOR_DB_PATH` | Milvus Lite 数据文件 | `data/milvus.db` |
+| `TURN_TOKEN_LIMIT` | 单轮 token 上限（第一层成本闸） | `8000` |
+| `CONVERSATION_DAILY_TOKEN_BUDGET` | 会话日 token 预算，0 表示关闭 | `0` |
+| `GLOBAL_DAILY_COST_YUAN` | 全局日成本上限（元），0 表示关闭 | `0` |
+| `LLM_PRICE_INPUT_PER_MTOK` | 输入价目（元/百万 token），不填则成本记 0 | `0` |
+| `LLM_PRICE_OUTPUT_PER_MTOK` | 输出价目（元/百万 token），不填则成本记 0 | `0` |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST` | Langfuse 追踪，三项缺一即不追踪 | `pk-lf-...` / `sk-lf-...` / `http://langfuse:3000` |
 
 > 不要用 `MILVUS_URI` 作变量名——pymilvus 会把它当服务端地址解析，
 > 相对文件路径会被判为非法 URI。
@@ -131,7 +137,7 @@ POST   /api/admin/reindex                 全量重建索引
 ## 接口
 
 - `POST /api/chat` — 请求 `{"message": "...", "visitor_id": "...", "conversation_id": "可选"}`，返回 SSE 流
-- `GET /api/history?conversation_id=...&visitor_id=...` — 拉取历史，越权返回 404
+- `GET /api/history?conversation_id=...&visitor_id=...` — 拉取历史，越权返回 404，每条消息带 `id`
 - `GET /api/conversations?visitor_id=...` — 该访客的会话列表
 - `GET /api/orders?visitor_id=...` — 该访客的订单，含已关联工单
 - `GET /api/work-orders?visitor_id=...` — 该访客的工单
@@ -141,6 +147,14 @@ POST   /api/admin/reindex                 全量重建索引
 - `POST /api/tool/cancel` — 取消待确认动作，同上
 - `GET /api/admin/tools` — 工具注册清单
 - `GET /api/admin/audit` — 工具调用流水，支持 `tool` / `visitor_id` / `status` / `limit` / `offset`
+- `POST /api/feedback` — 反馈，`{"message_id": 1, "rating": 1|-1, "reason": "可选", "comment": "可选"}`；重复提交覆盖，`rating: 0` 撤销
+- `GET /api/admin/eval/cases` — 评估样本列表，支持 `status` / `limit`
+- `POST /api/admin/eval/cases` — 新增样本（落候选池）
+- `POST /api/admin/eval/cases/{id}/status` — 状态流转 `candidate` / `accepted` / `retired`
+- `POST /api/admin/eval/cases/from-feedback/{id}`、`/from-low-conf/{id}`、`/from-item/{id}` — 三路转候选
+- `GET /api/admin/flywheel/feedback` / `cost` / `low-confidence` — 看板数据
+- `GET /api/admin/eval/runs`、`GET /api/admin/eval/runs/{run_id}` — 评估运行与明细
+- `POST /api/admin/eval/run` — 触发评估，`{"limit": 1-50, "case_ids": 可选, "judge": false}`，已有运行在跑返回 409
 - `GET /health` — 健康检查
 
 SSE 事件：
@@ -148,6 +162,7 @@ SSE 事件：
 | 载荷 | 含义 |
 |---|---|
 | `{"conversation_id": "..."}` | 会话 ID（首个事件） |
+| `{"message_id": 123}` | 本条回答的消息 ID，`[DONE]` 前推送，反馈靠它绑定 |
 | `{"delta": "..."}` | 文本增量 |
 | `{"tool": "...", "label": "...", "status": "start\|done"}` | 工具调用状态 |
 | `{"pending_action": {...}}` | 待确认动作（卡片内容由执行引擎生成） |
@@ -286,6 +301,32 @@ AI 无法直接建单。工单只可能由顾客点击产生，两条路径：
 | 咨询 / 投诉建议 / 其他 | 否 |
 
 校验在 Pydantic 层，模型无法绕过。无订单工单按「访客 + 类型」判重。
+
+## 数据飞轮
+
+闭环是「反馈 → 样本 → 评估 → 回归」，四步都落在 MySQL，看板入口 `/admin/flywheel`。
+
+六张表：`message_feedback`（反馈）、`llm_usage`（用量计量）、`budget_events`（触闸事件）、
+`eval_cases`（样本）、`eval_runs` / `eval_run_items`（运行与明细）。
+
+反馈一条回答最多一行，重复提交覆盖，`rating: 0` 撤销；标签与文字都可留空，
+点踩即刻落一条最小信息，之后可再补原因。
+
+成本三层软闸全部是降级不拒绝：单轮 token 上限换短上下文，会话日预算与全局日成本
+换兜底话术并记 `budget_events`。观测类写入一律 try/except 兜底，不许打断对话。
+
+评估默认只用确定性指标（引用命中、引用合规、拒答准确、意图准确），LLM 裁判靠
+`--judge` 显式开启。手工触发走看板，定时触发走 CLI：
+
+```bash
+uv run python scripts/eval_pipeline.py --limit 30
+```
+
+阈值 `pass_rate >= 0.8`、`citation_valid_rate >= 0.95` 未达标时退出码为 1，可直接挂计划任务。
+样本默认落候选池，人工采纳才进默认评估集。
+
+Langfuse 是可选件：缺配置或装配失败一律静默降级为不追踪，只服务排障，看板不依赖它。
+远程自托管编排在 `deploy/langfuse-compose.yml`，环境变量模板 `deploy/langfuse.env.example`。
 
 ## 暂不包含
 
