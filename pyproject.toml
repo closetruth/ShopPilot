@@ -19,6 +19,7 @@ dependencies = [
     "aiomysql>=0.3.2",
     "pymysql>=1.2.3",
     "tiktoken>=0.14.0",
+    "langchain-mcp-adapters>=0.3.2",
 ]
 
 [dependency-groups]

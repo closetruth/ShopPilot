@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "logistics": {
+      "transport": "stdio",
+      "command": "python",
+      "args": ["-m", "mcp_servers.logistics.server"],
+      "enabled": true,
+      "scope": "none",
+      "risk": "read",
+      "requires_confirmation": false,
+      "allowed_callers": ["agent"]
+    }
+  }
+}
