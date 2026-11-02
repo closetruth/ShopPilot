@@ -157,32 +157,56 @@ function statusBadge(status) {
   return span;
 }
 
-function renderDraftCard(draft) {
+async function postAction(path, action) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action_id: action.id, visitor_id: session.visitor_id }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || "HTTP " + res.status);
+  return data;
+}
+
+function showCardError(wrap, buttons, message) {
+  buttons.forEach((btn) => (btn.disabled = false));
+  let err = wrap.querySelector(".wo-error");
+  if (!err) {
+    err = document.createElement("p");
+    err.className = "wo-error";
+    wrap.appendChild(err);
+  }
+  err.textContent = message;
+}
+
+function renderPendingCard(action) {
+  const summary = action.summary || {};
   const wrap = document.createElement("div");
   wrap.className = "wo-card";
 
   const title = document.createElement("div");
   title.className = "wo-card-title";
-  title.textContent = "待确认工单";
+  title.textContent = summary.title || action.label || "待确认操作";
   wrap.appendChild(title);
 
-  const rows = [
-    ["订单号", draft.order_no || "未关联订单"],
-    ["问题类型", draft.issue_type],
-    ["涉及商品", draft.product || "（未关联具体商品）"],
-    ["问题描述", draft.description],
-  ];
-  for (const [label, value] of rows) {
+  for (const field of summary.fields || []) {
     const row = document.createElement("div");
     row.className = "wo-row";
     const k = document.createElement("span");
     k.className = "wo-k";
-    k.textContent = label;
+    k.textContent = field.k;
     const v = document.createElement("span");
     v.className = "wo-v";
-    v.textContent = value;
+    v.textContent = field.v;
     row.append(k, v);
     wrap.appendChild(row);
+  }
+
+  if (summary.note) {
+    const note = document.createElement("p");
+    note.className = "wo-meta";
+    note.textContent = summary.note;
+    wrap.appendChild(note);
   }
 
   const actions = document.createElement("div");
@@ -202,29 +226,30 @@ function renderDraftCard(draft) {
     confirmBtn.disabled = true;
     cancelBtn.disabled = true;
     try {
-      const res = await fetch("/api/work-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          draft_id: draft.draft_id,
-          visitor_id: session.visitor_id,
-        }),
-      });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      renderSubmittedCard(wrap, data.work_order, data.reason);
-      loadWorkOrders();
-    } catch {
-      actions.replaceChildren();
-      const err = document.createElement("p");
-      err.className = "wo-error";
-      err.textContent = "提交失败，请稍后重试";
-      wrap.appendChild(err);
+      const data = await postAction("/api/tool/confirm", action);
+      renderActionResult(wrap, data.result);
+      if (data.result && data.result.created) loadWorkOrders();
+    } catch (e) {
+      showCardError(wrap, [confirmBtn, cancelBtn], "提交失败：" + e.message);
     }
   });
 
-  cancelBtn.addEventListener("click", () => {
-    wrap.remove();
+  cancelBtn.addEventListener("click", async () => {
+    confirmBtn.disabled = true;
+    cancelBtn.disabled = true;
+    try {
+      await postAction("/api/tool/cancel", action);
+      wrap.replaceChildren();
+      const done = document.createElement("div");
+      done.className = "wo-card-title";
+      done.textContent = "已取消";
+      const note = document.createElement("p");
+      note.className = "wo-meta";
+      note.textContent = "本次操作已取消，未提交任何内容";
+      wrap.append(done, note);
+    } catch (e) {
+      showCardError(wrap, [confirmBtn, cancelBtn], "取消失败：" + e.message);
+    }
   });
 
   const row = document.createElement("div");
@@ -234,57 +259,45 @@ function renderDraftCard(draft) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-function renderSubmittedCard(card, order, reason) {
+function renderActionResult(card, result) {
   card.replaceChildren();
   const title = document.createElement("div");
   title.className = "wo-card-title";
-  title.textContent = reason === "duplicate" ? "已存在同类工单" : "工单已提交";
 
-  const no = document.createElement("div");
-  no.className = "wo-no";
-  no.textContent = order.work_order_no;
-
-  const meta = document.createElement("div");
-  meta.className = "wo-meta";
-  meta.append(statusBadge(order.status));
-  const t = document.createElement("span");
-  t.textContent = order.order_no
-    ? order.issue_type + " · " + order.order_no
-    : order.issue_type + " · 未关联订单";
-  meta.appendChild(t);
-
-  card.append(title, no, meta);
-
-  const descRow = document.createElement("div");
-  descRow.className = "wo-row";
-  const dk = document.createElement("span");
-  dk.className = "wo-k";
-  dk.textContent = "问题描述";
-  const dv = document.createElement("span");
-  dv.className = "wo-v";
-  dv.textContent = order.description;
-  descRow.append(dk, dv);
-  card.appendChild(descRow);
-
-  if (order.product) {
-    const p = document.createElement("div");
-    p.className = "wo-row";
-    const k = document.createElement("span");
-    k.className = "wo-k";
-    k.textContent = "涉及商品";
-    const v = document.createElement("span");
-    v.className = "wo-v";
-    v.textContent = order.product;
-    p.append(k, v);
-    card.appendChild(p);
+  if (!result || result.error) {
+    title.textContent = "执行失败";
+    const err = document.createElement("p");
+    err.className = "wo-error";
+    err.textContent = (result && result.error) || "请稍后重试";
+    card.append(title, err);
+    return;
   }
 
-  const link = document.createElement("button");
-  link.type = "button";
-  link.className = "wo-link";
-  link.textContent = "在「我的工单」中查看";
-  link.addEventListener("click", () => openOrdersPanel("workorders"));
-  card.appendChild(link);
+  title.textContent = result.created ? "工单已提交" : "已确认";
+  card.appendChild(title);
+
+  if (result.work_order_no) {
+    const no = document.createElement("div");
+    no.className = "wo-no";
+    no.textContent = result.work_order_no;
+    card.appendChild(no);
+  }
+
+  if (result.note) {
+    const note = document.createElement("p");
+    note.className = "wo-meta";
+    note.textContent = result.note;
+    card.appendChild(note);
+  }
+
+  if (result.work_order_no) {
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "wo-link";
+    link.textContent = "在「我的工单」中查看";
+    link.addEventListener("click", () => openOrdersPanel("workorders"));
+    card.appendChild(link);
+  }
 }
 
 function formatTime(iso) {
@@ -826,12 +839,12 @@ async function send(text) {
           if (!conversationId) createdNew = true;
           conversationId = msg.conversation_id;
           saveSession();
-        } else if (msg.work_order_draft) {
-          renderDraftCard(msg.work_order_draft);
+        } else if (msg.pending_action) {
+          renderPendingCard(msg.pending_action);
         } else if (msg.tool) {
           if (msg.status === "start") {
             toolHint.textContent =
-              msg.tool === "draft_work_order"
+              msg.tool === "create_work_order"
                 ? "正在准备工单…"
                 : "正在查询" + (msg.label || "") + "…";
             toolHint.hidden = false;

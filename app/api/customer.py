@@ -5,6 +5,7 @@ chat 的图单例与轨迹记录也在这里——它们只服务对话流。
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -20,12 +21,11 @@ from app.context_builder import build_context
 from app.llm import get_llm_quiet
 from app.schemas import WorkOrderCreate
 from app.tools import AgentContext, tool_labels
+from app.tools.executor import ActionError, executor
 
 logger = logging.getLogger(__name__)
 
 TOOL_LABELS = tool_labels()
-
-DRAFT_TOOL = "draft_work_order"
 
 
 class ChatRequest(BaseModel):
@@ -47,18 +47,11 @@ def _text_of(content) -> str:
 def _sse(payload) -> str:
     if payload == "[DONE]":
         return "data: [DONE]\n\n"
-    import json
-
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
-def _draft_from_tool_event(event: dict, visitor_id: str, conversation_id: str):
-    """从工具输出里取建单参数，交给后端建草稿。工具失败或参数缺失时返回 None。
-
-    这里刻意不读模型的自然语言输出：草稿内容只来自工具的结构化入参。
-    """
-    import json
-
+def _pending_from_tool_event(event: dict) -> dict | None:
+    """从工具输出里取待确认动作。卡片内容由执行引擎生成，不经模型转述。"""
     output = event.get("data", {}).get("output")
     raw = getattr(output, "content", output)
     if isinstance(raw, str):
@@ -70,30 +63,8 @@ def _draft_from_tool_event(event: dict, visitor_id: str, conversation_id: str):
         payload = raw
     if not isinstance(payload, dict):
         return None
-    if payload.get("drafted") is not True:
-        return None
-
-    order_no = payload.get("order_no")
-    issue_type = payload.get("issue_type")
-    if not issue_type:
-        return None
-
-    tool_input = event.get("data", {}).get("input", {})
-    description = tool_input.get("description")
-    if not description:
-        return None
-
-    try:
-        return store.create_work_order_draft(
-            visitor_id=visitor_id,
-            conversation_id=conversation_id,
-            order_no=order_no,
-            issue_type=issue_type,
-            description=description,
-        )
-    except Exception:  # noqa: BLE001 - 草稿失败不影响对话继续
-        logger.exception("生成工单草稿失败")
-        return None
+    action = payload.get("pending_action")
+    return action if isinstance(action, dict) else None
 
 
 def _record_turn_trace(
@@ -188,14 +159,10 @@ async def chat(req: ChatRequest) -> StreamingResponse:
                     name = event.get("name", "")
                     label = TOOL_LABELS.get(name, name)
                     yield _sse({"tool": name, "label": label, "status": "done"})
-                    if name == DRAFT_TOOL:
-                        # 草稿由后端按工具实际入参生成并直接推给前端，
-                        # 卡片内容不经过模型转述，杜绝编造
-                        draft = _draft_from_tool_event(
-                            event, req.visitor_id, conversation_id
-                        )
-                        if draft is not None:
-                            yield _sse({"work_order_draft": draft})
+                    action = _pending_from_tool_event(event)
+                    if action is not None:
+                        # 卡片由执行引擎生成并直接推给前端，内容不经过模型转述
+                        yield _sse({"pending_action": action})
 
             # 模板/知识路径的 final_text 不经 LLM 流式（或拼接生成），
             # 事件流里没有逐 token delta，从最终 state 一次性补发。
@@ -385,3 +352,26 @@ async def confirm_work_order(req: WorkOrderConfirm) -> dict:
         "created": True,
         "work_order": store.get_work_order(req.visitor_id, work_order_no),
     }
+
+
+class PendingActionRequest(BaseModel):
+    action_id: str = Field(min_length=1, max_length=64)
+    visitor_id: str = Field(min_length=1, max_length=64)
+
+
+@router.post("/api/tool/confirm")
+async def confirm_pending_action(req: PendingActionRequest) -> dict:
+    """顾客点确认后才会真正执行挂起的工具。参数取自数据库，前端只提供 id。"""
+    try:
+        result = await executor.confirm(req.action_id, visitor_id=req.visitor_id)
+    except ActionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return {"status": "confirmed", "result": result}
+
+
+@router.post("/api/tool/cancel")
+async def cancel_pending_action(req: PendingActionRequest) -> dict:
+    try:
+        return await executor.cancel(req.action_id, visitor_id=req.visitor_id)
+    except ActionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
