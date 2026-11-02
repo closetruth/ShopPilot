@@ -49,7 +49,7 @@
   - 测试：脱敏规则、截断、分页、写失败不影响调用方
   - 提交：`feat: 工具调用审计落库，参数脱敏与失败不阻断`
 
-- [ ] **Task 4：执行引擎**
+- [x] **Task 4：执行引擎**
   - `app/tools/executor.py`：`Executor.invoke(spec, runtime, raw_args)`
   - 顺序：参数校验（`args_schema.model_validate`）→ 鉴权 → 预览/执行 → 审计
   - 校验通过后把 `model_dump()` 传给 impl；工具体内的 `try/except ValidationError`

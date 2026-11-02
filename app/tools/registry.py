@@ -5,7 +5,6 @@ ToolNode 照常注入，`args_schema` 显式传入让模型可见 schema 与业�
 完全一致。调用统一落到执行引擎。
 """
 
-import asyncio
 import inspect
 import logging
 from dataclasses import dataclass
@@ -13,10 +12,10 @@ from typing import Any, Callable, Literal
 
 from langchain_core.tools import BaseTool, StructuredTool
 from langgraph.prebuilt import ToolRuntime
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from app.tools.context import AgentContext
-from app.tools.permission import Caller, CallerKind, Denied, authorize
+from app.tools.permission import CallerKind
 
 logger = logging.getLogger(__name__)
 
@@ -53,36 +52,6 @@ class ToolSpec:
             )
 
 
-def validation_error(exc: ValidationError) -> dict:
-    detail = "; ".join(
-        f"{'.'.join(str(p) for p in err['loc']) or '参数'}: {err['msg']}"
-        for err in exc.errors()
-    )
-    return {"error": f"参数不合法（{detail}）。请修正后重试。"}
-
-
-async def _dispatch(spec: ToolSpec, runtime: ToolRuntime, raw_args: dict) -> dict:
-    try:
-        args = spec.args_schema.model_validate(raw_args)
-    except ValidationError as exc:
-        return validation_error(exc)
-
-    context = getattr(runtime, "context", None)
-    caller = Caller(kind="agent", visitor_id=getattr(context, "visitor_id", None))
-    try:
-        authorize(spec, caller)
-    except Denied as exc:
-        return {"error": f"该操作不被允许：{exc}"}
-
-    return await call_impl(spec, runtime, args.model_dump())
-
-
-async def call_impl(spec: ToolSpec, runtime: ToolRuntime | None, args: dict) -> Any:
-    if inspect.iscoroutinefunction(spec.impl):
-        return await spec.impl(runtime, **args)
-    return await asyncio.to_thread(spec.impl, runtime, **args)
-
-
 class RegisteredTool(StructuredTool):
     """在 LangChain 默认解析上加两处修正。
 
@@ -108,7 +77,10 @@ class RegisteredTool(StructuredTool):
 
 def build_tool(spec: ToolSpec) -> BaseTool:
     async def entry(runtime: ToolRuntime[AgentContext], **kwargs) -> dict:
-        return await _dispatch(spec, runtime, kwargs)
+        # 延迟导入：执行引擎需要 ToolSpec，顶层导入会形成循环
+        from app.tools.executor import executor
+
+        return await executor.invoke(spec, runtime, kwargs)
 
     return RegisteredTool.from_function(
         coroutine=entry,
