@@ -144,6 +144,25 @@ CREATE TABLE IF NOT EXISTS agent_traces (
     KEY idx_traces_conv (conversation_id),
     KEY idx_traces_intent (intent)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS tool_audit_logs (
+    id              BIGINT        NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    conversation_id VARCHAR(32)   NULL,
+    visitor_id      VARCHAR(64)   NULL,
+    tool_name       VARCHAR(64)   NOT NULL,
+    source          VARCHAR(16)   NOT NULL,
+    caller          VARCHAR(16)   NOT NULL,
+    status          VARCHAR(16)   NOT NULL,
+    args_json       JSON          NULL,
+    result_digest   TEXT          NULL,
+    error           TEXT          NULL,
+    duration_ms     INT           NULL,
+    action_id       VARCHAR(32)   NULL,
+    created_at      DATETIME(6)   NOT NULL,
+    KEY idx_audit_tool (tool_name, created_at),
+    KEY idx_audit_visitor (visitor_id, created_at),
+    KEY idx_audit_status (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """
 
 

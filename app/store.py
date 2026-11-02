@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from app.db import conn_params as _conn_params
 from app.db import init_db, now
-from app.repo import chats, commerce, insights, knowledge
+from app.repo import audit, chats, commerce, insights, knowledge
 
 __all__ = [
     "init_db",
@@ -54,6 +54,10 @@ __all__ = [
     "record_trace",
     "list_traces",
     "trace_stats",
+    # 工具审计
+    "record_tool_audit",
+    "list_tool_audits",
+    "mask_audit_args",
 ]
 
 
@@ -119,3 +123,9 @@ low_confidence_stats = insights.stats
 record_trace = insights.record_trace
 list_traces = insights.list_traces
 trace_stats = insights.trace_stats
+
+# ---------- 工具审计 ----------
+
+record_tool_audit = audit.record
+list_tool_audits = audit.list_logs
+mask_audit_args = audit.mask_args

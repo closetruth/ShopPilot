@@ -39,7 +39,7 @@
     用 `RegisteredTool` 子类修正，spike 结论在真实工具上依然成立
   - 提交：`feat: 工具注册中心与三层权限，工具元数据可被程序读取`
 
-- [ ] **Task 3：审计表与仓储**
+- [x] **Task 3：审计表与仓储**
   - `db.py` SCHEMA 加 `tool_audit_logs`（含三个索引）
   - `app/repo/audit.py`：`record(...)` 与 `list_logs(tool, visitor_id, status, limit, offset)`
   - 脱敏：键名命中 `phone|mobile|address|real_name|id_card|email` → `***`；
