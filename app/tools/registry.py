@@ -38,6 +38,7 @@ class ToolSpec:
     requires_confirmation: bool = False
     allowed_callers: frozenset[CallerKind] = frozenset({"agent"})
     preview: Callable[..., Any] | None = None
+    summarize: Callable[[dict], dict] | None = None
     source: Source = "builtin"
     server: str | None = None
     timeout_s: float = DEFAULT_TIMEOUT_S
@@ -136,6 +137,7 @@ def registered(
     requires_confirmation: bool = False,
     allowed_callers: tuple[CallerKind, ...] = ("agent",),
     preview: Callable[..., Any] | None = None,
+    summarize: Callable[[dict], dict] | None = None,
     timeout_s: float = DEFAULT_TIMEOUT_S,
     source: Source = "builtin",
     server: str | None = None,
@@ -154,6 +156,7 @@ def registered(
             requires_confirmation=requires_confirmation,
             allowed_callers=allowed_callers,
             preview=preview,
+            summarize=summarize,
             timeout_s=timeout_s,
             source=source,
             server=server,

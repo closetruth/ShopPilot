@@ -163,6 +163,22 @@ CREATE TABLE IF NOT EXISTS tool_audit_logs (
     KEY idx_audit_visitor (visitor_id, created_at),
     KEY idx_audit_status (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS pending_actions (
+    id              VARCHAR(32)  NOT NULL PRIMARY KEY,
+    visitor_id      VARCHAR(64)  NOT NULL,
+    conversation_id VARCHAR(32)  NOT NULL DEFAULT '',
+    tool_name       VARCHAR(64)  NOT NULL,
+    args_json       JSON         NOT NULL,
+    summary_json    JSON         NOT NULL,
+    status          VARCHAR(16)  NOT NULL,
+    created_at      DATETIME(6)  NOT NULL,
+    expires_at      DATETIME(6)  NOT NULL,
+    resolved_at     DATETIME(6)  NULL,
+    result_json     JSON         NULL,
+    KEY idx_pending_visitor (visitor_id, created_at),
+    KEY idx_pending_status (status, expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """
 
 

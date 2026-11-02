@@ -94,53 +94,81 @@ def lookup_work_order(runtime, *, order_no: str) -> dict:
     return {"found": True, "work_order": order}
 
 
-@registered(
-    name="draft_work_order",
-    label="工单草稿",
-    args_schema=WorkOrderCreate,
-    scope="visitor",
-    risk="write",
-    allowed_callers=("agent",),
-)
-def draft_work_order(runtime, *, order_no=None, issue_type, description) -> dict:
-    """为顾客准备一张待确认的售后工单草稿。本工具不会真正提交工单：
-    它只把内容存成草稿，界面上会出现确认卡片，由顾客点击按钮后才会提交。
-
-    因此你不需要征求顾客口头同意，随时可以起草；但必须先把问题类型与
-    问题描述问清楚，缺信息时先追问。顾客点击界面上的确认按钮后工单才会
-    生成，你无法直接建立工单，也不要宣称「已提交」。
-
-    订单号规则：运输破损 / 发货延迟 / 质量问题 / 退换货 必须有订单号，
-    可先用 list_my_orders 找到；咨询 / 投诉建议 / 其他 无需订单号。
-
-    同一顾客同一订单同一类型已有未完结工单时不会起草，会返回既有工单。"""
+def _work_order_preview(runtime, *, order_no=None, issue_type, description) -> dict:
+    """挂起前的只读检查：订单归属与重复建单。任一不通过就不生成确认卡片。"""
     visitor_id = runtime.context.visitor_id
-
     try:
         if order_no is not None and not store.visitor_has_order(visitor_id, order_no):
             return {
+                "ok": False,
                 "created": False,
                 "reason": "order_not_found",
-                "note": "系统中查不到该订单号属于当前顾客，无法起草工单。"
-                "请顾客核对订单号，或说明需要人工核实。不要改为直接起草。",
+                "note": "系统中查不到该订单号属于当前顾客，无法建单。"
+                "请顾客核对订单号，或说明需要人工核实。不要改为直接建单。",
             }
 
         existing = store.find_open_work_order(visitor_id, order_no, issue_type)
         if existing is not None:
             return {
+                "ok": False,
                 "created": False,
                 "reason": "duplicate",
                 "existing_work_order_no": existing["id"],
                 "existing_status": existing["status"],
-                "note": "该顾客已有同类未完结工单，请告知正在处理中，不要重复起草。",
+                "note": "该顾客已有同类未完结工单，请告知正在处理中，不要重复建单。",
             }
     except Exception:  # noqa: BLE001 - 数据库异常作为数据回给模型
-        return {"error": "工单草稿创建失败，请稍后重试或转人工处理"}
+        return {"ok": False, "error": "工单检查暂时不可用，请稍后重试或转人工处理"}
+
+    return {"ok": True}
+
+
+def _work_order_summary(args: dict) -> dict:
+    """确认卡片的全部内容。前端只认 title/fields/note 三样。"""
+    return {
+        "title": "待确认工单",
+        "fields": [
+            {"k": "订单号", "v": args.get("order_no") or "不关联订单"},
+            {"k": "问题类型", "v": args["issue_type"]},
+            {"k": "问题描述", "v": args["description"]},
+        ],
+        "note": "确认后才会真正提交，可随时取消",
+    }
+
+
+@registered(
+    name="create_work_order",
+    label="建工单",
+    args_schema=WorkOrderCreate,
+    scope="visitor",
+    risk="write",
+    requires_confirmation=True,
+    allowed_callers=("agent",),
+    preview=_work_order_preview,
+    summarize=_work_order_summary,
+)
+def create_work_order(runtime, *, order_no=None, issue_type, description) -> dict:
+    """为顾客提交一张售后工单。本工具不会立刻建单：它会先生成确认卡片，
+    顾客点击确认后工单才真正生成。
+
+    因此你不需要征求顾客口头同意，随时可以准备建单；但必须先把问题类型与
+    问题描述问清楚，缺信息时先追问。你无法直接建立工单，也不要宣称「已提交」。
+
+    订单号规则：运输破损 / 发货延迟 / 质量问题 / 退换货 必须有订单号，
+    可先用 list_my_orders 找到；咨询 / 投诉建议 / 其他 无需订单号。
+
+    同一顾客同一订单同一类型已有未完结工单时不会生成卡片，会返回既有工单。"""
+    visitor_id = runtime.context.visitor_id
+
+    try:
+        work_order_no = store.create_work_order(
+            visitor_id, order_no, issue_type, description, source="ai"
+        )
+    except Exception:  # noqa: BLE001 - 数据库异常作为数据回给模型
+        return {"error": "工单创建失败，请稍后重试或转人工处理"}
 
     return {
-        "drafted": True,
-        "order_no": order_no,
-        "issue_type": issue_type,
-        "note": "草稿已生成，确认卡片会显示在界面上。请告知顾客核对卡片内容并点击确认提交，"
-        "不要说「已提交」或给出工单号——工单此时尚未创建。",
+        "created": True,
+        "work_order_no": work_order_no,
+        "note": f"工单 {work_order_no} 已提交成功，可以告知顾客单号。",
     }

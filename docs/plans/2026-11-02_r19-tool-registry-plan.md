@@ -60,7 +60,7 @@
   - 测试：校验失败/鉴权拒绝/超时/impl 抛异常/正常，五种都断言审计行
   - 提交：`feat: 执行引擎统一校验与鉴权，工具调用全程留痕`
 
-- [ ] **Task 5：待确认动作**
+- [x] **Task 5：待确认动作**
   - `db.py` SCHEMA 加 `pending_actions`；`app/repo/pending.py`
     （create/get/resolve/list_by_visitor，30 分钟过期）
   - `Executor.confirm` / `Executor.cancel`：归属校验（不区分 404 防探测）、
@@ -71,7 +71,7 @@
   - 测试：建 action → 确认 → 工单生成；取消；过期；跨访客 404；重复预览拒绝
   - 提交：`feat: 通用待确认动作，建工单迁为第一个实例`
 
-- [ ] **Task 6：SSE 与对话页接线**
+- [x] **Task 6：SSE 与对话页接线**
   - `customer.py`：删掉 `_draft_from_tool_event` 的工具输出反解析，
     改为转发 executor 已生成的 `pending_action`；`TOOL_LABELS` 改由注册表取 label
   - 新增 `POST /api/tool/confirm`、`POST /api/tool/cancel`

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from app.db import conn_params as _conn_params
 from app.db import init_db, now
-from app.repo import audit, chats, commerce, insights, knowledge
+from app.repo import audit, chats, commerce, insights, knowledge, pending
 
 __all__ = [
     "init_db",
@@ -58,6 +58,11 @@ __all__ = [
     "record_tool_audit",
     "list_tool_audits",
     "mask_audit_args",
+    # 待确认动作
+    "create_pending_action",
+    "get_pending_action",
+    "resolve_pending_action",
+    "list_pending_actions",
 ]
 
 
@@ -129,3 +134,10 @@ trace_stats = insights.trace_stats
 record_tool_audit = audit.record
 list_tool_audits = audit.list_logs
 mask_audit_args = audit.mask_args
+
+# ---------- 待确认动作 ----------
+
+create_pending_action = pending.create
+get_pending_action = pending.get
+resolve_pending_action = pending.resolve
+list_pending_actions = pending.list_by_visitor

@@ -13,7 +13,7 @@ BUSINESS_FOUR = {
     "lookup_product",
     "list_my_orders",
     "lookup_work_order",
-    "draft_work_order",
+    "create_work_order",
 }
 
 

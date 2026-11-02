@@ -15,7 +15,7 @@ BUILTIN_FOUR = {
     "lookup_product",
     "list_my_orders",
     "lookup_work_order",
-    "draft_work_order",
+    "create_work_order",
 }
 
 
@@ -53,9 +53,11 @@ def test_builtin_tools_registered_with_metadata():
     order = registry.get("list_my_orders")
     assert order.scope == "visitor"
 
-    draft = registry.get("draft_work_order")
-    assert draft.risk == "write"
-    assert draft.label == "工单草稿"
+    work_order = registry.get("create_work_order")
+    assert work_order.risk == "write"
+    assert work_order.label == "建工单"
+    assert work_order.requires_confirmation is True
+    assert work_order.summarize is not None
 
 
 def test_tool_label_lookup():
