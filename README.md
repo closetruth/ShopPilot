@@ -63,9 +63,15 @@ app/
   knowledge_node.py 知识检索节点：改写→检索→0.65 置信度闸→生成回答
   query_rewrite.py  售后口语→政策术语的词表（意图售后词的单一代码源）
   templates.py 投诉/闲聊固定话术（零 LLM），投诉自动建工单
-  tools.py     业务工具：查商品 / 查订单 / 查工单 / 起草工单
-  checkpointer.py 会话工作状态 checkpoint（MySQL，SQLite 兜底）
+  tools/
+    registry.py  工具注册中心：ToolSpec 元数据 + 注册表 + 包装工具
+    builtin.py   内置工具：查商品 / 查订单 / 查工单 / 建工单（待确认）
+    permission.py 权限模型：调用者白名单 + 数据范围 + 风险等级
+    executor.py  执行引擎：校验 → 鉴权 → 预览 → 执行 → 审计
+    context.py   AgentContext（注入给工具的访客身份）
+    mcp.py       MCP 客户端：拉外部工具并入同一注册表
   schemas.py   工具参数校验模型
+  checkpointer.py 会话工作状态 checkpoint（MySQL）
   llm.py       ChatOpenAI 工厂（OpenAI 兼容；流式/非流式两个实例）
   embedding.py BGE-M3 嵌入（硅基流动）
   vector_store.py Milvus 索引与检索（仅 FAQ）
@@ -75,8 +81,13 @@ app/
     commerce.py  商品、订单、工单、工单草稿
     knowledge.py FAQ 政策知识
     insights.py  低置信度问题、agent 轨迹
+    audit.py     工具调用审计流水
+    pending.py   待确认动作
   store.py     上述仓储的转发门面，调用方统一从这里访问
-  static/      聊天页面
+  static/      聊天页面（`/`）与管理页（`/admin`、`/admin/tools`）
+mcp_servers/
+  logistics/server.py  示例 MCP 服务器（物流时效，stdio）
+mcp_servers.json        MCP 服务器配置
 scripts/
   seed.py                    演示数据（幂等）
   import_faq.py              政策文档导入（幂等）
@@ -126,6 +137,10 @@ POST   /api/admin/reindex                 全量重建索引
 - `GET /api/work-orders?visitor_id=...` — 该访客的工单
 - `POST /api/work-orders/drafts` — 顾客主动提单时建草稿
 - `POST /api/work-orders` — 凭 `draft_id` 确认提交（只接受 id，不接受内容）
+- `POST /api/tool/confirm` — 确认待确认动作，请求 `{"action_id": "...", "visitor_id": "..."}`
+- `POST /api/tool/cancel` — 取消待确认动作，同上
+- `GET /api/admin/tools` — 工具注册清单
+- `GET /api/admin/audit` — 工具调用流水，支持 `tool` / `visitor_id` / `status` / `limit` / `offset`
 - `GET /health` — 健康检查
 
 SSE 事件：
@@ -135,7 +150,7 @@ SSE 事件：
 | `{"conversation_id": "..."}` | 会话 ID（首个事件） |
 | `{"delta": "..."}` | 文本增量 |
 | `{"tool": "...", "label": "...", "status": "start\|done"}` | 工具调用状态 |
-| `{"work_order_draft": {...}}` | 待确认工单草稿，由后端直推 |
+| `{"pending_action": {...}}` | 待确认动作（卡片内容由执行引擎生成） |
 | `[DONE]` | 正常结束 |
 | `{"error": "..."}` | 出错 |
 
@@ -168,9 +183,59 @@ SSE 事件：
 | `lookup_product` | 按关键词或 ID 查商品价格、颜色、库存 | 不返回成本价等内部字段 |
 | `list_my_orders` | 列出当前顾客的订单 | 无参数，只返回本人订单 |
 | `lookup_work_order` | 按订单号查工单进度 | 只能查本人；查不到时不区分「不存在」与「不属于你」 |
-| `draft_work_order` | 起草待确认的工单 | **不写库**，仅生成草稿供前端确认 |
+| `create_work_order` | 准备提交售后工单 | **不写库**，先生成确认卡片，顾客点击后才真正建单 |
 
 参数经 Pydantic 校验，非法时返回结构化错误让模型自行纠正，不中断对话。
+
+### 注册中心与执行引擎
+
+所有工具（含 MCP 外部工具）都在 `app/tools/registry.py` 注册，元数据统一
+描述三层权限：数据范围 `scope`（none/visitor/admin）、风险 `risk`
+（read/write/destructive）、调用者白名单 `allowed_callers`。
+`destructive` 工具在注册期就强制要求顾客确认，配置写错直接启动失败。
+
+调用一律经过 `app/tools/executor.py`：校验 → 鉴权 → （预览）→ 执行 →
+审计。每次调用写一行 `tool_audit_logs`，含参数掩码、结果摘要、错误与耗时；
+被拒绝和超时的调用同样留痕。`GET /admin/tools` 可看注册清单与调用流水。
+
+需要顾客确认的工具用 `requires_confirmation=True` + `preview` / `summarize`
+两个钩子：`preview` 在挂起前做只读检查（不通过就不出卡片），`summarize`
+生成卡片内容。动作存 `pending_actions` 表，30 分钟过期，确认时参数从库里
+重放——前端只传 `action_id`，不传参数。
+
+**与 `work_order_drafts` 的关系**：草稿表服务「顾客手填提单」这条独立入口
+（`POST /api/work-orders/drafts`），`pending_actions` 服务「AI 提议、顾客
+确认」这条链路。两者并行，互不影响。
+
+### MCP 外部工具
+
+`mcp_servers.json` 描述要连的服务器，stdio 传输会拉起子进程：
+
+```json
+{
+  "servers": {
+    "logistics": {
+      "transport": "stdio",
+      "command": "python",
+      "args": ["-m", "mcp_servers.logistics.server"],
+      "enabled": true,
+      "scope": "none",
+      "risk": "read",
+      "requires_confirmation": false,
+      "allowed_callers": ["agent"]
+    }
+  }
+}
+```
+
+- `command: "python"` 会被替换成当前解释器，避免 uv 环境里找不到
+- `scope` / `risk` / `requires_confirmation` / `allowed_callers` 可按服务器覆盖
+- 工具在注册表里叫 `{server}__{tool}`，`source="mcp"`
+- 单台服务器连不上只记 warning 并跳过，服务照常启动
+- `MCP_ENABLED=1` 开启，`MCP_CONFIG` 指定别的配置文件路径
+
+`mcp_servers/logistics/server.py` 是一个示例服务器（`query_shipping_eta`）。
+stdio 传输下 stdout 被 JSON-RPC 独占，服务器日志必须写 stderr。
 
 ## 向量检索
 

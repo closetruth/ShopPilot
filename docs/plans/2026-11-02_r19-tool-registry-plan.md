@@ -80,7 +80,7 @@
   - 测试：SSE 事件序列含 `pending_action`；confirm 接口越权 404；取消不落单
   - 提交：`feat: 待确认动作接进 SSE 与对话页，确认由顾客点击触发`
 
-- [ ] **Task 7：MCP 接入**
+- [x] **Task 7：MCP 接入**
   - `pyproject.toml` 加 `langchain-mcp-adapters`
   - `mcp_servers/logistics/server.py`：`FastMCP` + `query_shipping_eta`，
     日志只走 stderr，stdout 留给协议
@@ -93,7 +93,7 @@
     配错命令时服务仍启动
   - 提交：`feat: MCP 客户端接入，外部工具进同一注册中心与执行链`
 
-- [ ] **Task 8：注册清单与审计页**
+- [x] **Task 8：注册清单与审计页**
   - `GET /api/admin/tools`、`GET /api/admin/audit`
   - `app/static/admin_tools.html` + `admin_tools.js`，复用 `admin.css`
   - 上半注册清单表，下半审计流水表，按工具与状态过滤，「加载更多」
@@ -101,8 +101,8 @@
   - 测试：两个接口的字段与过滤
   - 提交：`feat: 注册清单与审计流水页，工具行为可回溯`
 
-- [ ] **Task 9：回归、浏览器实跑、文档**
-  - `uv run pytest` 全绿
+- [x] **Task 9：回归、浏览器实跑、文档**
+  - `uv run pytest` 全绿（329 passed）
   - 浏览器逐条走设计文档第 16 节验收表 1–9
   - README 补工具注册中心、MCP 配置、`pending_actions` 与草稿表双轨说明
   - `docs/dev-notes/r19.md` 收尾段（前面各阶段已边做边补）

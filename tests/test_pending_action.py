@@ -29,6 +29,19 @@ def _ensure_schema():
     store.init_db()
 
 
+@pytest.fixture(autouse=True)
+def _isolate_registry():
+    """用例往全局注册表塞临时工具，跑完必须还原，
+    否则后面断言「只有四个内置工具」的用例会连带失败。"""
+    specs = dict(registry._specs)
+    tools = dict(registry._tools)
+    try:
+        yield
+    finally:
+        registry._specs = specs
+        registry._tools = tools
+
+
 def _name(base: str) -> str:
     return f"{base}_{uuid.uuid4().hex[:8]}"
 
