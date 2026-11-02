@@ -57,12 +57,12 @@ def _tools_tokens() -> int:
     用 tool_call_schema（排除 ToolRuntime 注入字段）——args_schema
     含 callable 字段，model_json_schema 会炸。
     """
-    from app.tools import TOOLS
+    from app.tools import agent_tools
 
     import json
 
     parts = []
-    for t in TOOLS:
+    for t in agent_tools():
         parts.append(t.name)
         parts.append(t.description or "")
         try:

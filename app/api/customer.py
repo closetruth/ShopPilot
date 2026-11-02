@@ -19,16 +19,11 @@ from app.api._graph import get_graph
 from app.context_builder import build_context
 from app.llm import get_llm_quiet
 from app.schemas import WorkOrderCreate
-from app.tools import AgentContext
+from app.tools import AgentContext, tool_labels
 
 logger = logging.getLogger(__name__)
 
-TOOL_LABELS = {
-    "lookup_product": "商品",
-    "list_my_orders": "订单",
-    "lookup_work_order": "工单",
-    "draft_work_order": "工单草稿",
-}
+TOOL_LABELS = tool_labels()
 
 DRAFT_TOOL = "draft_work_order"
 

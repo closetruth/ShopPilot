@@ -23,7 +23,7 @@
   - 测试：`tests/test_tool_wrapper.py`
   - 提交：`test: 钉住包装工具的 runtime 注入，确认不动 create_react_agent 也能拦截`
 
-- [ ] **Task 2：注册表与权限模型**
+- [x] **Task 2：注册表与权限模型**
   - `app/tools.py` 拆成包：`__init__.py` / `registry.py` / `permission.py` /
     `builtin.py`，`AgentContext` 从 `__init__` 导出，现有 import 不破
   - `ToolSpec` 数据类（name/label/description/args_schema/impl/scope/risk/
@@ -34,6 +34,9 @@
   - 四个内置工具迁入 `builtin.py`，语义不变（此时 `draft_work_order` 仍叫原名）
   - `TOOLS` 常量改为 `agent_tools()`；`agent.py` / `context_builder.py` 跟着改
   - 测试：注册/重名/白名单过滤/四种 scope×risk 组合/destructive 注册即报错
+  - 实测补丁：LangChain 默认解析有两处会把注入参数弄丢（`extra="forbid"`
+    schema 把 `runtime` 判成多余字段；空入参 schema 直接短路返回空 kwargs），
+    用 `RegisteredTool` 子类修正，spike 结论在真实工具上依然成立
   - 提交：`feat: 工具注册中心与三层权限，工具元数据可被程序读取`
 
 - [ ] **Task 3：审计表与仓储**

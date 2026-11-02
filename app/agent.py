@@ -14,7 +14,7 @@ from langchain_core.messages import AIMessage
 from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import create_react_agent
 
-from app.tools import TOOLS, AgentContext
+from app.tools import AgentContext, agent_tools
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ def build_business_agent(*, llm=None):
 
     return create_react_agent(
         model=llm or get_llm(),
-        tools=TOOLS,
+        tools=agent_tools(),
         prompt=BUSINESS_PROMPT,
         context_schema=AgentContext,
     )

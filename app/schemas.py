@@ -52,6 +52,12 @@ class ProductQuery(BaseModel):
 ORDER_NO_RE = re.compile(r"^[A-Z0-9]{8,32}$")
 
 
+class NoArgs(BaseModel):
+    """无参数工具的空入参。显式声明以拒绝模型塞入多余字段。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class WorkOrderQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
