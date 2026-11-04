@@ -12,15 +12,19 @@ r13 标注集 473 条。远端 192.168.6.23 上 `19530`（Milvus）与 `22`（SS
 
 ---
 
-- [ ] **Task 0：远端能力探测（先做，结论决定后面怎么走）**
+- [x] **Task 0：远端能力探测（先做，结论决定后面怎么走）**
   - `ssh 192.168.6.23` 上执行 `nvidia-smi`、`docker info`、`docker images`
   - 探测 `8010` 端口是否可开；若被防火墙挡住，退路是 SSH 隧道
     （`ssh -L 8010:127.0.0.1:8010`），本机仍然只当 HTTP 客户端
   - 记录：GPU 型号/显存、CUDA 版本、可用内存、磁盘剩余、HF 镜像站可达性
   - 产出：把结论写进 `docs/dev-notes/r21.md` 开头
   - 提交：`docs: 记录远端算力现状，决定训练落在哪台机器上`
+  - 实测补丁：SSH 只支持密码、无免密通道，**拿不到 GPU 型号**。改为
+    「容器运行时自适应」——`server.py` 探 CUDA，compose 默认 CPU 配置 +
+    `trainer-gpu.yml` 覆盖文件；端口做成 `TRAINER_PORT` 可配并保留 SSH
+    隧道退路。`3307` 未开放是因为远端 MySQL 走 `3306`，不是故障
 
-- [ ] **Task 1：四张新表 + 仓储**
+- [x] **Task 1：四张新表 + 仓储**
   - `app/core/db.py` 的 `SCHEMA` 追加 `finetune_labels` /
     `finetune_datasets` / `finetune_jobs` / `finetune_models`，字段照设计 §5
   - 新增 `app/repo/finetune.py`：
@@ -33,6 +37,8 @@ r13 标注集 473 条。远端 192.168.6.23 上 `19530`（Milvus）与 `22`（SS
   - 测试：`tests/test_finetune_repo.py` —— 建表可查、label 唯一键覆盖、
     激活唯一性、任务状态流转
   - 提交：`feat: 微调四张表落地，标注与训练版本可追溯`
+  - 实测补丁：`normalize_query` 必须连空白一起去掉，否则「能 退 吗」与
+    「能退吗」算出两个 hash，同一句话会被标两次
 
 - [ ] **Task 2：数据导出与清洗（纯函数）**
   - 新增 `scripts/finetune_dataset.py`，拆两层：

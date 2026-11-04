@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS finetune_labels (
     query        VARCHAR(512) NOT NULL,
     query_hash   CHAR(32)     NOT NULL,
     low_conf_id  BIGINT       NULL,
-    doc_id       VARCHAR(64)  NULL,
+    faq_id       VARCHAR(64)  NULL,
     label        VARCHAR(16)  NOT NULL,
     note         VARCHAR(256) NULL,
     annotator    VARCHAR(32)  NOT NULL DEFAULT 'human',
@@ -168,7 +168,9 @@ CREATE TABLE IF NOT EXISTS finetune_models (
   还是 r13，只标一次，重复提交覆盖。
 - `label` 三值：`doc`（应命中某条 FAQ）/ `missing`（知识库缺失）/ `noise`
   （非政策问题）。只有 `doc` 能进训练正样本。
-- `doc_id` 存文档级 id（`P-RET-001`），与 r13 标注集同口径。
+- `faq_id` 存**检索单元** id（`faq_documents.id`，如 `P-RET-001-3`），不是
+  文档 id：向量库里索引的是小节，精排打分的也是小节，标注必须同口径。
+  r13 标注集的 `expected_doc_id` 同样是这个粒度，可直接合并。
 - `finetune_models.active` 用「先全置 0 再置 1」保证唯一活跃版本，回滚就是
   改这一列 + 通知推理服务重载。
 
