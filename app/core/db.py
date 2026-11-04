@@ -268,6 +268,56 @@ CREATE TABLE IF NOT EXISTS eval_run_items (
     created_at  DATETIME(6)  NOT NULL,
     KEY idx_eval_items_run (run_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS finetune_labels (
+    id          BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    query       VARCHAR(512) NOT NULL,
+    query_hash  CHAR(32)     NOT NULL,
+    low_conf_id BIGINT       NULL,
+    faq_id      VARCHAR(64)  NULL,
+    label       VARCHAR(16)  NOT NULL,
+    note        VARCHAR(255) NULL,
+    annotator   VARCHAR(32)  NOT NULL DEFAULT 'human',
+    created_at  DATETIME(6)  NOT NULL,
+    updated_at  DATETIME(6)  NOT NULL,
+    UNIQUE KEY uk_labels_hash (query_hash),
+    KEY idx_labels_label (label, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS finetune_datasets (
+    id         BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name       VARCHAR(64)  NOT NULL,
+    path       VARCHAR(255) NOT NULL,
+    split_json JSON         NULL,
+    stats_json JSON         NULL,
+    created_at DATETIME(6)  NOT NULL,
+    KEY idx_datasets_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS finetune_jobs (
+    id           VARCHAR(32)  NOT NULL PRIMARY KEY,
+    dataset_id   BIGINT       NOT NULL,
+    status       VARCHAR(16)  NOT NULL,
+    params_json  JSON         NULL,
+    metrics_json JSON         NULL,
+    log_path     VARCHAR(255) NULL,
+    error        VARCHAR(255) NULL,
+    started_at   DATETIME(6)  NOT NULL,
+    finished_at  DATETIME(6)  NULL,
+    KEY idx_jobs_status (status, started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS finetune_models (
+    id           BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    version      VARCHAR(32)  NOT NULL,
+    base_model   VARCHAR(64)  NOT NULL,
+    model_dir    VARCHAR(255) NOT NULL,
+    onnx_path    VARCHAR(255) NOT NULL,
+    metrics_json JSON         NULL,
+    active       TINYINT(1)   NOT NULL DEFAULT 0,
+    created_at   DATETIME(6)  NOT NULL,
+    UNIQUE KEY uk_models_version (version)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """
 
 
