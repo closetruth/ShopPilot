@@ -1,0 +1,26 @@
+# 训练镜像的构建上下文是仓库根，所以要把用不上的东西排掉，
+# 否则每次 build 都要把 Milvus 数据文件和本地虚拟环境打包送进 daemon。
+.venv/
+.git/
+.pytest_cache/
+.superpowers/
+# docs/ 整体排除（里面是大量设计文档与评估产物，打包进 build context 只是
+# 拖慢 build）。唯一例外是 r13 标注集：它是训练正样本的唯一来源，Dockerfile
+# 要 COPY 它进镜像。Docker 不允许「父目录被排除后再单独放回子文件」，所以
+# 这里逐层写：先放回目录，再排除其内容，最后放回那一个文件。
+docs/*
+!docs/eval/
+docs/eval/*
+!docs/eval/r13-queries.csv
+eval_data/
+data/
+tests/
+mcp_servers/
+superpowers/
+app/data/
+deploy/trainer-compose.yml
+deploy/trainer-gpu.yml
+deploy/*.env
+.env
+.env.example
+*.pyc

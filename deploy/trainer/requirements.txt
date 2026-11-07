@@ -1,0 +1,24 @@
+# 训练与推理容器的依赖。
+#
+# torch 单独在 Dockerfile 里装：CPU/GPU 两个版本走不同的索引地址，
+# 混在 requirements 里会导致 GPU 机器也拉到 CPU 轮子。
+transformers==4.44.2
+tokenizers==0.19.1
+onnx==1.16.2
+onnxruntime==1.19.2
+fastapi==0.115.0
+uvicorn[standard]==0.31.0
+pydantic==2.9.2
+numpy==1.26.4
+scikit-learn==1.5.2
+
+# 数据集在容器内直接读远端 MySQL 构建，所以训练镜像也需要 MySQL 驱动。
+# 用同步版 pymysql 而不是 aiomysql：取数走的是同步仓储层，没必要为一次
+# 批量构建引入异步连接池。
+pymysql==1.1.1
+
+# MySQL 8 默认 caching_sha2_password。pymysql 走「快速认证」时不需要它，
+# 但服务端一旦重启、密码缓存清空，就会退回需要 RSA 加密的完整认证，此时
+# 缺 cryptography 直接抛 RuntimeError。本地开发连的是同一个库、缓存热着，
+# 所以这个问题只在容器里、只在 MySQL 重启后出现——踩过一次，必须装。
+cryptography==43.0.3

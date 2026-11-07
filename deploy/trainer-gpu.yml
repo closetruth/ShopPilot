@@ -1,0 +1,25 @@
+# GPU 覆盖文件：只在远端确认有 NVIDIA 卡后使用。
+#
+# 用法：docker compose -f deploy/trainer-compose.yml -f deploy/trainer-gpu.yml up -d --build
+#
+# 需要宿主机装好 nvidia-container-toolkit，否则 device 声明会让容器起不来。
+# 注意 TORCH_INDEX_URL 必须换成 cu121 版本，否则装的是 CPU 轮子，
+# torch.cuda.is_available() 会一直 False。
+
+services:
+  trainer:
+    build:
+      args:
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cu121
+        # 置空才会走上面的索引地址，否则会去下 CPU 轮子
+        TORCH_WHEEL_URL: ""
+    environment:
+      BATCH_SIZE: ${BATCH_SIZE:-16}
+      FP16: "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

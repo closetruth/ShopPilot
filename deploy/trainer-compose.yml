@@ -1,0 +1,76 @@
+# 精排微调训练服务（默认 CPU 配置）。
+#
+# 远端算力未知，默认不声明 GPU：声明了却没有 nvidia 运行时，compose 直接
+# 起不来。确认有卡后再叠加 deploy/trainer-gpu.yml。
+#
+# 启动：docker compose -f deploy/trainer-compose.yml up -d --build
+# 带 GPU：docker compose -f deploy/trainer-compose.yml -f deploy/trainer-gpu.yml up -d --build
+#
+# 端口默认 8010（远端探测时该端口空闲）。若被防火墙拦，本机用 SSH 隧道：
+#   ssh -L 8010:127.0.0.1:8010 <user>@192.168.6.23
+
+services:
+  trainer:
+    build:
+      # 上下文是仓库根：数据集要在容器内直接读远端 MySQL 构建，
+      # 需要 app/ 的取数层与 scripts/finetune_dataset.py 一起进镜像。
+      # 相对路径的基准是**本文件所在目录**（deploy/），所以是 `..` 而不是
+      # `../..`——写成 `../..` 时上下文变成仓库根的上一级，Dockerfile 里的
+      # `COPY app /app/app` 会直接找不到文件
+      context: ..
+      dockerfile: deploy/trainer/Dockerfile
+    image: shoppilot-trainer:latest
+    container_name: shoppilot-trainer
+    restart: unless-stopped
+    ports:
+      - "${TRAINER_PORT:-8010}:8010"
+    # MySQL 跑在宿主的另一个容器里（只发布了 3306 端口），容器内的
+    # 127.0.0.1 是它自己，连不到宿主。显式映射一个 host-gateway 别名，
+    # 让默认值能直接用，不必要求部署者每次手工填 IP
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      BASE_MODEL: ${BASE_MODEL:-hfl/chinese-roberta-wwm-ext}
+      HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
+      TRAINER_TOKEN: ${TRAINER_TOKEN:-}
+      MAX_LENGTH: ${MAX_LENGTH:-256}
+      EPOCHS: ${EPOCHS:-4}
+      LR: ${LR:-2e-5}
+      BATCH_SIZE: ${BATCH_SIZE:-0}
+      SEED: ${SEED:-20261104}
+      FP16: ${FP16:-0}
+      # 数据集构建直连远端 MySQL。标注、FAQ、轨迹本来就在这台机器上，
+      # 没必要先拉到本地再传回来
+      MYSQL_HOST: ${MYSQL_HOST:-host.docker.internal}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER:-shoppilot}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shoppilot}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-shoppilot}
+    volumes:
+      - trainer-data:/app/data
+      - trainer-models:/app/models
+      - trainer-hf:/models/hf
+      - trainer-logs:/app/logs
+      # 检索快照。可选：没有它时候选会从 MySQL 的 `retrieved` 还原（线上
+      # 检索当时真实返回的那几条），训练与标注都不会因为缺文件而断。
+      # 有快照时更好——候选 5 条且带排序分，困难负例质量更高：
+      #   docker cp data/finetune/candidates.jsonl shoppilot-trainer:/app/candidates/
+      - trainer-candidates:/app/candidates
+    # CPU 兜底上限：训练会吃满所有核，不限的话远端其他服务会跟着卡。
+    # 内存上限按「宿主留给别人多少」倒推，不是按训练想用多少：
+    # 宿主 7.3G，四个基础容器已占 2G，剩下 5.3G 里还必须留出内核页缓存与
+    # sshd 的余量。给 5G 时 cgroup 一逼近上限就进入直接回收，整机连带卡死，
+    # 现象是训练日志突然中断、随后 ssh 都连不上（实测踩过一次，只能重启）。
+    # 所以默认压到 4G：训练实际峰值约 3G，留 1G 缓冲。
+    deploy:
+      resources:
+        limits:
+          cpus: "${TRAINER_CPUS:-10}"
+          memory: ${TRAINER_MEMORY:-4g}
+
+volumes:
+  trainer-data:
+  trainer-models:
+  trainer-hf:
+  trainer-logs:
+  trainer-candidates:
