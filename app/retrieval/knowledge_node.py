@@ -11,10 +11,11 @@ final_text 返回给调用方。
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
 
 from app.core import store
-from app.retrieval import vector_store
+from app.retrieval import rerank, vector_store
 from app.retrieval.query_rewrite import rewrite_query
 
 logger = logging.getLogger(__name__)
@@ -29,9 +30,59 @@ RELEVANCE_THRESHOLD = 0.58
 # 比检索阈值高——0.58 只保证「有点相关」，0.65 才接近「足以作答」。
 INSUFFICIENT_THRESHOLD = 0.65
 
+# 召回条数。不开精排时只要 3 条；开了要放宽，否则精排只能给已知的 3 条
+# 换个顺序，救不回被向量排在第 8 位的正确条款——那正是精排唯一的价值。
+RECALL_K = 3
+DEFAULT_RERANK_RECALL_K = 10
+
 # 拒答话术直接给到顾客，不经过 LLM——理由与 _insufficient 的设计相同：
 # 不留任何可以被模型补编的空间。
 REFUSAL_TEMPLATE = "这个问题我这边没有查到相关规定，建议以商品详情页为准，或为您转接人工客服。"
+
+
+def rerank_enabled() -> bool:
+    """精排开关。默认关。
+
+    关着是为了让阈值标定有据可依：精排分与向量分是两个量纲，把向量分
+    标定出的 0.65 直接套到精排分上，等于用一把没刻度的尺去拦回答。
+    """
+    return (os.getenv("RERANK_ENABLED") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def rerank_recall_k() -> int:
+    """开精排时的向量召回条数。
+
+    读环境变量而非模块常量：`.env` 由 `app.core.llm` 在导入时加载，
+    而本模块可能先于它被导入，常量会在环境变量就位前定死。
+    """
+    raw = (os.getenv("RERANK_RECALL_K") or "").strip()
+    if not raw:
+        return DEFAULT_RERANK_RECALL_K
+    try:
+        return max(int(raw), RECALL_K)
+    except ValueError:
+        logger.warning("RERANK_RECALL_K 不是整数（%s），按 %d", raw, DEFAULT_RERANK_RECALL_K)
+        return DEFAULT_RERANK_RECALL_K
+
+
+def rerank_min_score() -> float | None:
+    """精排分阈值。没设就返回 None，表示「闸仍用向量分，精排只管排序」。
+
+    这样开了精排但还没标定阈值时，最坏结果是顺序变化而判定不变，不会
+    把本来能答的问题一把拒掉。
+    """
+    raw = (os.getenv("RERANK_MIN_SCORE") or "").strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        logger.warning("RERANK_MIN_SCORE 不是数字（%s），按未标定处理", raw)
+        return None
 
 
 @dataclass(frozen=True)
@@ -82,7 +133,8 @@ async def run_knowledge_retrieval(
     import anyio
 
     rewritten_query, terms = rewrite_query(resolved_query)
-    top_k = 3
+    use_rerank = rerank_enabled()
+    top_k = rerank_recall_k() if use_rerank else RECALL_K
 
     # 嵌入是同步 HTTP 调用，整个 search（嵌入+查询）放进线程池执行，
     # 避免阻塞事件循环
@@ -90,13 +142,13 @@ async def run_knowledge_retrieval(
         lambda: vector_store.search(rewritten_query, "", top_k=top_k)
     )
     hits = sorted(hits, key=lambda h: h["score"], reverse=True)[:top_k]
-    max_score = hits[0]["score"] if hits else 0.0
+    vector_max = hits[0]["score"] if hits else 0.0
 
     fallback_used = False
     if (
         terms
         and not hits
-        or (terms and max_score < INSUFFICIENT_THRESHOLD)
+        or (terms and vector_max < INSUFFICIENT_THRESHOLD)
     ):
         # 改写可能带偏（词表术语把命中拉向错误条款）：原话回退重查一次，
         # 取分数更高的一组——保证改写不比现状差
@@ -105,8 +157,8 @@ async def run_knowledge_retrieval(
         )
         orig_hits = sorted(orig_hits, key=lambda h: h["score"], reverse=True)[:top_k]
         orig_max = orig_hits[0]["score"] if orig_hits else 0.0
-        if orig_max > max_score:
-            hits, max_score = orig_hits, orig_max
+        if orig_max > vector_max:
+            hits, vector_max = orig_hits, orig_max
             fallback_used = True
 
     if not hits:
@@ -120,7 +172,22 @@ async def run_knowledge_retrieval(
             fallback_used=fallback_used,
         )
 
-    if max_score < INSUFFICIENT_THRESHOLD:
+    # 精排：只改顺序，不轻易改判定。降级时保持向量分的判断——精排挂了
+    # 不能让本来能答的问题变成拒答。
+    reranked = False
+    if use_rerank:
+        hits, reranked = await _rerank_hits(resolved_query, hits)
+
+    max_score = hits[0]["score"] if hits else 0.0
+    threshold = INSUFFICIENT_THRESHOLD
+    calibrated = rerank_min_score() if reranked else None
+    if calibrated is not None:
+        threshold = calibrated
+    elif reranked:
+        # 精排分还没标定过：排序听精排的，闸仍用向量分。
+        max_score = vector_max
+
+    if max_score < threshold:
         _record_low_confidence(
             visitor_id, resolved_query, "low_score", max_score,
             [h["source_id"] for h in hits],
@@ -134,10 +201,12 @@ async def run_knowledge_retrieval(
             fallback_used=fallback_used,
         )
 
-    # 内容一律取自 MySQL 原文：向量库里存的是为检索拼接、可能被截断的文本
+    # 内容一律取自 MySQL 原文：向量库里存的是为检索拼接、可能被截断的文本。
+    # 过滤看向量分：RELEVANCE_THRESHOLD 是在向量分上标定的，拿它比精排分
+    # 会把相关条款也筛掉。
     results = []
     for hit in hits:
-        if hit["score"] < RELEVANCE_THRESHOLD:
+        if hit.get("vector_score", hit["score"]) < RELEVANCE_THRESHOLD:
             continue
         row = store.faq_by_id(hit["source_id"])
         if row is None:
@@ -179,6 +248,49 @@ async def run_knowledge_retrieval(
         rewritten_query=rewritten_query,
         fallback_used=fallback_used,
     )
+
+
+async def _rerank_hits(query: str, hits: list[dict]) -> tuple[list[dict], bool]:
+    """精排召回结果，返回 (新的 hits, 是否真的重排了)。
+
+    失败一律返回原 hits 与 False，让调用方退回向量分的判断。这里不走
+    `strict=False` 的降级分支：它会给每条打 0 分，调用方若拿它过阈值闸，
+    就会把本来能答的问题全拒掉。
+
+    每条保留 `vector_score`，因为下游的 RELEVANCE_THRESHOLD 是在向量分上
+    标定的，混用会筛错。
+    """
+    import anyio
+
+    if not hits:
+        return hits, False
+
+    ids = [h["source_id"] for h in hits]
+    try:
+        scored = await anyio.to_thread.run_sync(
+            lambda: rerank.rerank(query, ids, top_n=RECALL_K, strict=True)
+        )
+    except rerank.RerankUnavailable as exc:
+        logger.warning("精排不可用，退回向量分：%s", exc)
+        return hits, False
+    except Exception as exc:  # noqa: BLE001 - 精排任何异常都不能拖垮检索
+        logger.warning("精排异常，退回向量分：%s", exc)
+        return hits, False
+
+    if not scored:
+        return hits, False
+
+    by_id = {h["source_id"]: h for h in hits}
+    merged = [
+        {
+            **by_id[doc_id],
+            "vector_score": by_id[doc_id]["score"],
+            "score": score,
+        }
+        for doc_id, score in scored
+        if doc_id in by_id
+    ]
+    return merged or hits, bool(merged)
 
 
 async def _compose_answer(query: str, results: list[dict], llm) -> str:

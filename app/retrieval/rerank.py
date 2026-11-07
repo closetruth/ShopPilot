@@ -98,7 +98,7 @@ def rerank(
             endpoint(),
             headers=headers,
             json={
-                "model": os.getenv("RERANK_MODEL", DEFAULT_MODEL),
+                "model": (os.getenv("RERANK_MODEL") or DEFAULT_MODEL).strip(),
                 "query": query,
                 "documents": docs,
                 "top_n": min(top_n, len(docs)),
