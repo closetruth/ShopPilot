@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>精排微调 · ShopPilot</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body class="admin-body">
+  <div class="admin">
+    <header class="admin-head">
+      <h1>精排微调</h1>
+      <div class="admin-actions">
+        <span class="admin-count" id="ftProgress"></span>
+        <a class="btn btn-link" href="/admin/flywheel">数据飞轮</a>
+        <a class="btn btn-link" href="/admin">知识库管理</a>
+        <a class="btn btn-link" href="/">返回对话</a>
+      </div>
+    </header>
+
+    <main class="admin-main ft-main">
+      <section class="ft-panel">
+        <div class="ft-progress-wrap">
+          <div class="ft-progress"><span id="ftProgressBar"></span></div>
+          <div class="ft-progress-label" id="ftProgressLabel"></div>
+        </div>
+        <p class="ft-hint">
+          <kbd>1</kbd>–<kbd>5</kbd> 选中候选条款　<kbd>0</kbd> 知识库缺失　
+          <kbd>X</kbd> 噪声（非政策问题）　<kbd>↑</kbd><kbd>↓</kbd> 翻条
+        </p>
+
+        <article class="ft-query-card" id="ftQueryCard"></article>
+        <div class="ft-candidates" id="ftCandidates"></div>
+        <div class="ft-nav">
+          <button class="btn" id="ftPrev" type="button">上一条</button>
+          <span class="ft-index" id="ftIndex"></span>
+          <button class="btn" id="ftSkip" type="button">跳过</button>
+          <button class="btn" id="ftNext" type="button">下一条</button>
+        </div>
+
+        <section class="ft-build">
+          <div class="ft-build-head">
+            <h2>数据集</h2>
+            <button class="btn btn-primary" id="ftBuild" type="button">生成 train/dev/test</button>
+          </div>
+          <div id="ftBuildResult"></div>
+        </section>
+
+        <section class="ft-build">
+          <div class="ft-build-head">
+            <h2>训练</h2>
+            <span id="ftTrainerState" class="ft-gate"></span>
+          </div>
+          <p class="ft-hint">
+            训练在远端容器内跑，直接从远端 MySQL 读标注，不经过本地。
+          </p>
+          <div class="ft-params" id="ftParams">
+            <label>轮数 <input id="ftEpochs" type="number" min="1" max="10" value="3"></label>
+            <label>学习率 <input id="ftLr" type="number" step="0.00001" min="0" value="0.00002"></label>
+            <label>最大长度 <input id="ftMaxLen" type="number" min="64" max="512" step="32" value="256"></label>
+            <label>批大小 <input id="ftBatch" type="number" min="0" max="64" value="0"></label>
+          </div>
+          <div class="ft-build-head">
+            <span id="ftGateHint" class="ft-hint"></span>
+            <button class="btn btn-primary" id="ftTrain" type="button">开始训练</button>
+          </div>
+          <div id="ftJobResult"></div>
+        </section>
+
+        <section class="ft-build">
+          <div class="ft-build-head">
+            <h2>模型</h2>
+            <button class="btn" id="ftRefreshModels" type="button">刷新</button>
+          </div>
+          <p class="ft-hint">
+            三把尺缺一不可：离线指标、低置信度回放、端到端回归。端到端要跑整张对话图，
+            只能在本地跑完把两个数字填在这里；不填则门禁按未达标处理，激活会被拒绝。
+          </p>
+          <div class="ft-params">
+            <label>端到端 doc_hit_rate <input id="ftE2eDocHit" type="number" step="0.01" min="0" max="1"></label>
+            <label>基线 doc_hit_rate <input id="ftE2eBaseline" type="number" step="0.01" min="0" max="1"></label>
+          </div>
+          <div id="ftModels"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="/admin_finetune.js?v=20261106"></script>
+</body>
+</html>

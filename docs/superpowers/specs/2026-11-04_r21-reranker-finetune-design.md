@@ -293,7 +293,7 @@ RERANK_ENABLED=0（默认）
 
 RERANK_ENABLED=1
   召回 top-10 → 精排（微调模型）→ 取 top-3
-  → 精排分 ≥ RERANK_ANSWER_THRESHOLD 才作答，否则拒答
+  → 精排分 ≥ RERANK_MIN_SCORE 才作答，否则拒答
 ```
 
 拒答仍走 `REFUSAL_TEMPLATE` 并落 `low_confidence_queries`——**开了精排之后
@@ -305,7 +305,7 @@ RERANK_ENABLED=1
 `INSUFFICIENT_THRESHOLD` 保留给旧路径。新阈值：
 
 - 在 dev split 上扫 0.1–0.9，步长 0.02，取 Youden J 最大点
-- 写 `.env` 的 `RERANK_ANSWER_THRESHOLD`，不硬编码
+- 写 `.env` 的 `RERANK_MIN_SCORE`，不硬编码
 - `scripts/finetune_eval.py` 输出标定曲线，供人工确认
 
 ### 8.3 回滚
