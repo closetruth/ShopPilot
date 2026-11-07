@@ -221,7 +221,12 @@ def fetch_low_conf(limit: int | None = None) -> list[dict]:
 
 
 def fetch_r13(path: Path | None = None) -> list[dict]:
-    """r13 已标注检索集，直接复用，不重标。"""
+    """r13 已标注检索集，直接复用，不重标。
+
+    `candidates_raw` 是 CSV 里的原始候选串（`P-XXX:0.64 | P-YYY:0.61`），
+    带出来是为了在训练集里配 hard negative：r13 的 473 条金标是正样本
+    主力，没有候选就只剩随机负例，模型学不到「相近但不正确」的边界。
+    """
     path = path or R13_CSV
     if not path.exists():
         return []
@@ -239,6 +244,7 @@ def fetch_r13(path: Path | None = None) -> list[dict]:
                     "low_conf_id": None,
                     "retrieved": [],
                     "expected_faq_id": expected,
+                    "candidates_raw": (row.get("candidates") or "").strip(),
                 }
             )
     return out
@@ -312,11 +318,98 @@ def _read_candidates(path: Path | None = None) -> list[dict]:
     return rows
 
 
+def _candidates_from_retrieved() -> dict[str, list[dict]]:
+    """把库里已有的 `retrieved` 还原成候选条款，按 query hash 索引。
+
+    `low_confidence_queries.retrieved` 是线上检索当时真实返回的那几条。
+    用它当 hard negative 比重新跑一次检索更贴近线上：精排要面对的正是
+    「同主题、但确实答不上」的干扰项，而随机抽的条款往往主题都不同，
+    模型只要学会「主题不匹配就判 0」就能把训练集做满分，一到线上遇到
+    同主题干扰就全部给高分——这一轮实测里 abstain 全部不拒就是这个现象。
+
+    走这条路还有个工程上的好处：它已经在 MySQL 里，不需要 embedding、
+    不需要 `docker cp candidates.jsonl`。原先候选是本地算好再拷进容器的
+    一次性产物，忘了同步就让 hard_neg 归零，而归零不会报错，只会让指标
+    看起来漂亮、线上分不开闸——这正是要消掉的那类失败模式。
+    """
+    from app.core import store
+    from app.repo import finetune as finetune_repo
+
+    faq = {row["id"]: row for row in store.list_faq(None)}
+    out: dict[str, list[dict]] = {}
+    for row in fetch_low_conf():
+        cands = []
+        for faq_id in row["retrieved"]:
+            item = faq.get(faq_id)
+            # 停用条款线上检索拿不到，拿它当负例等于教模型区分一个线上
+            # 永远不会出现的输入
+            if not item or not item.get("enabled"):
+                continue
+            cands.append(
+                {
+                    "faq_id": item["id"],
+                    "title": item.get("title") or "",
+                    "category": item.get("category") or "",
+                    "section": item.get("section") or "",
+                    "content": item.get("content") or "",
+                    # 检索分保留为空：它是旧一次检索的打分，与现在这次训练
+                    # 无关，填进去只会让人误以为能拿来排序
+                    "score": None,
+                }
+            )
+        if cands:
+            out[finetune_repo.query_hash(row["query"])] = cands
+    return out
+
+
+def _r13_gold(raw: str | None, faq: dict) -> str | None:
+    """r13 的 `expected_doc_id` 可能是 `A|B`，表示两个答案都算对。
+
+    训练只能给一个金标，取第一个仍启用的条款；被丢掉的那些在候选里仍
+    存在，可以作为负例来源。
+    """
+    for part in (raw or "").split("|"):
+        faq_id = part.strip()
+        item = faq.get(faq_id)
+        if item and item.get("enabled"):
+            return faq_id
+    return None
+
+
+def _r13_candidates(raw: str | None, faq: dict) -> list[dict]:
+    """解析 r13 CSV 的 `P-XXX:0.64 | P-YYY:0.61` 候选串。
+
+    分数留空，理由同 `_candidates_from_retrieved`：那是旧一次检索的打分，
+    与本次训练无关，填进去会让人误以为能拿来排序。
+    """
+    out: list[dict] = []
+    for part in (raw or "").split("|"):
+        faq_id = part.split(":")[0].strip()
+        item = faq.get(faq_id)
+        if not item or not item.get("enabled"):
+            continue
+        out.append(
+            {
+                "faq_id": item["id"],
+                "title": item.get("title") or "",
+                "category": item.get("category") or "",
+                "section": item.get("section") or "",
+                "content": item.get("content") or "",
+                "score": None,
+            }
+        )
+    return out
+
+
 def load_labeled(candidates_path: Path | None = None) -> list[dict]:
     """把人工标注结论拼成可切分的行。
 
     `missing` 与 `noise` 没有金标条款，category 记 `unknown`：它们不参与
     正样本，但仍要参与分层统计——否则缺口报告会漏掉「哪类问题压根没条款」。
+
+    人工标注之后追加 r13 的 473 条金标。两份数据是互补的：r13 是离线抽样
+    的书面问法，人工标注是线上真实低置信度问题，后者更贴近线上分布，所以
+    同一句话两边都有时以人工结论为准。
     """
     from app.core import store
     from app.repo import finetune as finetune_repo
@@ -327,10 +420,16 @@ def load_labeled(candidates_path: Path | None = None) -> list[dict]:
         finetune_repo.query_hash(row["query"]): row.get("candidates") or []
         for row in _read_candidates(candidates_path)
     }
+    # 快照文件优先，缺了就从库里 `retrieved` 还原。两者都不存在时
+    # candidates 为空，hard_neg 会归零——所以宁可多查一次 MySQL。
+    retrieved_map = _candidates_from_retrieved()
 
     out: list[dict] = []
+    seen: set[str] = set()
     for row in labels:
         gold = faq.get(row["faq_id"]) if row["faq_id"] else None
+        key = finetune_repo.query_hash(row["query"])
+        seen.add(key)
         out.append(
             {
                 "query": row["query"],
@@ -338,11 +437,61 @@ def load_labeled(candidates_path: Path | None = None) -> list[dict]:
                 "faq_id": row["faq_id"],
                 "gold": gold,
                 "category": gold["category"] if gold else "unknown",
-                "candidates": cand_map.get(finetune_repo.query_hash(row["query"])) or [],
+                "candidates": cand_map.get(key) or retrieved_map.get(key) or [],
                 "low_conf_id": row["low_conf_id"],
+                "origin": "human",
+            }
+        )
+
+    for row in fetch_r13():
+        key = finetune_repo.query_hash(row["query"])
+        if key in seen:
+            continue
+        gold_id = _r13_gold(row["expected_faq_id"], faq)
+        if not gold_id:
+            continue
+        gold = faq[gold_id]
+        seen.add(key)
+        out.append(
+            {
+                "query": row["query"],
+                "label": "doc",
+                "faq_id": gold_id,
+                "gold": gold,
+                "category": gold["category"],
+                "candidates": _r13_candidates(row["candidates_raw"], faq)
+                or retrieved_map.get(key)
+                or [],
+                "low_conf_id": None,
+                "origin": "r13",
             }
         )
     return out
+
+
+def load_faq_pool() -> list[dict]:
+    """全部条款的文档侧文本，供负例抽样与全池评估。
+
+    key 用 `faq_documents.id`，与 `finetune_labels.faq_id` 是同一空间。
+    两处标识不一致会让金标被当成负例喂进训练，那是最难发现的一类错误：
+    指标不会崩，只是学不出来。
+
+    只取 `enabled = 1`：线上检索根本拿不到停用条款，把它放进评估池会让
+    排名变好看但线上不成立。`doc_id` 一并带出，抽样负例时要排除金标所在
+    的整篇文档——同篇的其他小节往往部分相关，标成 0 会教模型反向学习。
+    """
+    from app.core import store
+
+    return [
+        {
+            "faq_id": row["id"],
+            "doc_id": row["doc_id"],
+            "doc": _doc_text(row),
+            "category": row["category"],
+        }
+        for row in store.list_faq(None)
+        if row.get("enabled")
+    ]
 
 
 def split(
@@ -401,12 +550,20 @@ def _synonym_variants(query: str) -> list[str]:
 def augment(
     train_rows: list[dict],
     traces: list[dict] | None = None,
+    *,
+    pool: list[dict] | None = None,
+    seed: int = 20261104,
+    negatives_per_positive: int = 2,
 ) -> tuple[list[dict], dict]:
     """训练集增强。dev/test 永不经过这里。
 
     四路来源各有分工：轨迹改写是免费的真实口语样本；规则同义词兜住常见
     换说法；hard negative 来自同批候选里分数最高但不是金标的条款——随机
-    负例太容易，模型学不到「为什么这条不是答案」。
+    负例太容易，模型学不到「为什么这条不是答案」；候选快照缺失时用全池
+    随机负例兜底。
+
+    兜底这一路不是可选项：没有负例的训练集只有正样本，BCE 的最优解是
+    给所有输入打高分——模型学不到任何区分信号，而 loss 会漂亮地下降。
     """
     from app.repo.finetune import normalize_query
 
@@ -419,8 +576,39 @@ def augment(
         if key and rewritten and normalize_query(rewritten) != key:
             trace_map.setdefault(key, rewritten)
 
+    rng = random.Random(seed)
+    doc_by_id = {row["faq_id"]: row["doc"] for row in (pool or [])}
+    doc_owner = {row["faq_id"]: row.get("doc_id") for row in (pool or [])}
+
+    def sample_negatives(exclude: set, k: int, exclude_docs: set | None = None) -> list:
+        """从全池抽 k 条不在 exclude 里的条款，确定性（seed 固定）。
+
+        `exclude_docs` 排除金标所在的整篇文档：同一篇的其他小节往往部分
+        相关，把它标成 0 等于教模型「相关的也要判不相关」。
+        """
+        if k <= 0:
+            return []
+        exclude_docs = exclude_docs or set()
+        others = [
+            faq_id
+            for faq_id in doc_by_id
+            if faq_id not in exclude
+            and doc_owner.get(faq_id) not in exclude_docs
+        ]
+        if not others:
+            return []
+        return rng.sample(others, min(k, len(others)))
+
     pairs: list[dict] = []
-    stats = {"positive": 0, "trace": 0, "synonym": 0, "hard_neg": 0, "noise_neg": 0}
+    stats = {
+        "positive": 0,
+        "trace": 0,
+        "synonym": 0,
+        "hard_neg": 0,
+        "random_neg": 0,
+        "noise_neg": 0,
+        "missing_neg": 0,
+    }
 
     for row in train_rows:
         gold = row["gold"]
@@ -435,7 +623,7 @@ def augment(
                     "label": 1,
                     "origin_id": origin,
                     "faq_id": row["faq_id"],
-                    "source": "human",
+                    "source": row.get("origin", "human"),
                 }
             )
             stats["positive"] += 1
@@ -469,10 +657,16 @@ def augment(
                 )
                 stats["synonym"] += 1
 
+            # 候选里同篇文档的其他小节直接丢掉：它们是同一份政策的另一段，
+            # 标成 0 会教模型压掉「近义但正确」的条款，线上表现是该答的答
+            # 不上——比召回不到更难查。空出来的槽位由后面的随机负例补，
+            # 那条路径本来就排除了金标所在的整篇。
+            gold_doc = (gold or {}).get("doc_id")
             negatives = [
                 cand
                 for cand in row["candidates"]
                 if cand["faq_id"] != row["faq_id"]
+                and doc_owner.get(cand["faq_id"]) != gold_doc
             ][:2]
             for cand in negatives:
                 pairs.append(
@@ -487,29 +681,80 @@ def augment(
                 )
                 stats["hard_neg"] += 1
 
-        elif label == "noise":
-            # 噪声问题配上政策条款做负例，教模型认「这句问的根本不是政策」
-            for cand in row["candidates"][:1]:
+            # 候选快照缺失时 hard_neg 为 0，这里补随机负例，保证每条正例
+            # 至少有一个负例可学。金标与已用过的候选都排除，避免把答案
+            # 标成不相关。
+            taken = {row["faq_id"]} | {cand["faq_id"] for cand in negatives}
+            gold_docs = {(gold or {}).get("doc_id")}
+            for neg_id in sample_negatives(
+                taken, negatives_per_positive - len(negatives), gold_docs
+            ):
                 pairs.append(
                     {
                         "query": row["query"],
-                        "doc": f"{cand['title']}：{cand['content']}",
+                        "doc": doc_by_id[neg_id],
+                        "label": 0,
+                        "origin_id": origin,
+                        "faq_id": neg_id,
+                        "source": "random_negative",
+                    }
+                )
+                stats["random_neg"] += 1
+
+        elif label in ("noise", "missing"):
+            # noise：这句话问的根本不是政策；missing：看着像政策问题，但库里
+            # 确实没有条款能答。对精排而言两者是同一种输入——「给定任何条款
+            # 都该判 0」。
+            #
+            # missing 原先完全没进训练，后果在 dev 尺上一眼可见：模型对没有
+            # 答案的问题照样打 0.9 分，和正例的金标分几乎重合，阈值无论取
+            # 多少都分不开「该答」和「该拒」。闸的负例不能只靠 noise 撑，
+            # 它俩的措辞分布差太远。
+            is_missing = label == "missing"
+            k = negatives_per_positive if is_missing else 1
+            picks = row["candidates"][:k]
+            if not picks:
+                # 同样兜底：没有候选快照时这类标注一条都进不了训练
+                picks = [
+                    {"faq_id": neg_id, "title": "", "content": doc_by_id[neg_id]}
+                    for neg_id in sample_negatives(set(), k)
+                ]
+            for cand in picks:
+                doc = (
+                    f"{cand['title']}：{cand['content']}"
+                    if cand["title"]
+                    else cand["content"]
+                )
+                pairs.append(
+                    {
+                        "query": row["query"],
+                        "doc": doc,
                         "label": 0,
                         "origin_id": normalize_query(row["query"]),
                         "faq_id": cand["faq_id"],
-                        "source": "noise_negative",
+                        "source": (
+                            "missing_negative" if is_missing else "noise_negative"
+                        ),
                     }
                 )
-                stats["noise_neg"] += 1
+                stats["missing_neg" if is_missing else "noise_neg"] += 1
 
     return pairs, stats
 
 
-def build_pairs(splits: dict[str, list[dict]], traces: list[dict] | None = None) -> dict:
+def build_pairs(
+    splits: dict[str, list[dict]],
+    traces: list[dict] | None = None,
+    *,
+    pool: list[dict] | None = None,
+    seed: int = 20261104,
+) -> dict:
     """把三分集行展开成训练对。dev/test 只保留人工正例，不掺任何增强。"""
     from app.repo.finetune import normalize_query
 
-    train_pairs, aug_stats = augment(splits["train"], traces)
+    train_pairs, aug_stats = augment(
+        splits["train"], traces, pool=pool, seed=seed
+    )
 
     plain: dict[str, list[dict]] = {}
     for name in ("dev", "test"):
@@ -524,6 +769,23 @@ def build_pairs(splits: dict[str, list[dict]], traces: list[dict] | None = None)
                         "origin_id": normalize_query(row["query"]),
                         "faq_id": row["faq_id"],
                         "source": "human",
+                    }
+                )
+            elif row["label"] in ("missing", "noise"):
+                # 这两类是「本来就不该答」的人工标注，必须留在 dev/test。
+                # 原先这里直接丢掉，导致 dev/test 只剩 4 条正例：Hit@1 的
+                # 最小刻度是 0.25，MRR 早停在三轮里三次一模一样，等于用
+                # 噪声挑轮次。它们同时也是阈值标定唯一真实的负样本——
+                # 正例只能给出「最强的错误对手」，给不出「该不该开口」。
+                rows.append(
+                    {
+                        "query": row["query"],
+                        "doc": "",
+                        "label": 0,
+                        "origin_id": normalize_query(row["query"]),
+                        "faq_id": None,
+                        "source": "human",
+                        "expect": "abstain",
                     }
                 )
         plain[name] = rows
@@ -559,6 +821,14 @@ def build_dataset(
     out_dir = out_dir or OUT_DIR
     labeled = load_labeled(candidates_path)
     if not labeled:
+        # 两个来源都可能是空的，报错必须说清是哪个，否则会把人引到标注页
+        # 上去——而缺的其实是 r13 那份 CSV（容器里没拷进镜像时就是这样）
+        if not R13_CSV.exists():
+            return {
+                "ok": False,
+                "reason": "no_r13",
+                "message": f"找不到 r13 标注集：{R13_CSV}；它提供全部正样本",
+            }
         return {
             "ok": False,
             "reason": "no_labels",
@@ -567,11 +837,16 @@ def build_dataset(
 
     splits = split(labeled, seed=seed)
     traces = store.list_traces(limit=1000)
-    built = build_pairs(splits, traces)
+    pool = load_faq_pool()
+    built = build_pairs(splits, traces, pool=pool, seed=seed)
 
     names = ("train", "dev", "test")
     for name in names:
         export_jsonl(built[name], out_dir / f"{name}.jsonl")
+
+    # 全池快照：评估时金标要跟全部条款竞争第一名。没有它，评估只能在
+    # dev 自己的 3 条正例里排序，那算出来的 MRR 与随机排序无法区分。
+    export_jsonl(pool, out_dir / "faq_pool.jsonl")
     (out_dir / "split.json").write_text(
         json.dumps(
             {
@@ -598,6 +873,7 @@ def build_dataset(
         "labeled": len(labeled),
         "labels": label_counts,
         "positive": label_counts.get("doc", 0),
+        "pool": len(pool),
         "splits": {name: len(splits[name]) for name in names},
         "pairs": {name: len(built[name]) for name in names},
         "augment": built["augment"],
