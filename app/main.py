@@ -24,6 +24,22 @@ logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """静态资源一律要求回源校验。
+
+    默认的 StaticFiles 只给 ETag/Last-Modified，浏览器会按「距上次修改
+    时间的 10%」自行估算新鲜期。脚本改坏了再改好，估算出来的新鲜期可能
+    还有几小时，普通刷新根本不会回源——页面就一直卡在旧的那份坏脚本上，
+    看起来像「功能没写」。加 no-cache 后每次都用 ETag 校验，内容没变则
+    回 304，代价只有一个请求往返。
+    """
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     store.init_db()
@@ -67,4 +83,4 @@ async def health() -> dict:
     return {"status": "ok"}
 
 
-app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+app.mount("/", NoCacheStaticFiles(directory=STATIC_DIR, html=True), name="static")
