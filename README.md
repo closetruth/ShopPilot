@@ -1,6 +1,6 @@
 # ShopPilot
 
-电商智能客服系统。对话走 LangGraph 图：意图分流四路（知识检索 / 业务
+电商智能客服Agent。对话走 LangGraph 图：意图分流四路（知识检索 / 业务
 agent / 投诉模板 / 闲聊模板），AI 客服能查真实商品数据与顾客自己的工单
 进度，会话工作状态经 MySQL checkpoint 持久化，支持多会话。
 
